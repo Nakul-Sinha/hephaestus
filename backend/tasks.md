@@ -59,15 +59,15 @@ This file is the execution loop for completing the backend to the scope defined 
 
 ## Stage 5 - Testing + Hardening
 
-- [ ] Add unit tests for service and repository logic.
-- [ ] Add API integration tests for health and incident flow.
-- [ ] Validate full flow: ingest -> risk -> plan -> optimize -> simulate -> report.
-- [ ] Update backend/readme.md with final implemented status notes.
-- [ ] Create stage-5.md and commit stage.
+- [x] Add unit tests for service and repository logic.
+- [x] Add API integration tests for health and incident flow.
+- [x] Validate full flow: ingest -> risk -> plan -> optimize -> simulate -> report.
+- [x] Update backend/readme.md with final implemented status notes.
+- [x] Create stage-5.md and commit stage.
 
 ## Definition Of Completion
 
-- [ ] All stage checklists complete.
-- [ ] Stage 1 through Stage 5 commits created.
-- [ ] Stage handoff files stage-1.md through stage-5.md exist.
-- [ ] Backend endpoints are functional and return standardized envelopes.
+- [x] All stage checklists complete.
+- [x] Stage 1 through Stage 5 commits created.
+- [x] Stage handoff files stage-1.md through stage-5.md exist.
+- [x] Backend endpoints are functional and return standardized envelopes.

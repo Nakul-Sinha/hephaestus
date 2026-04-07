@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from uuid import uuid4
 
 from backend.contracts import (
@@ -201,6 +202,11 @@ class IncidentService:
         record = self.repository.get(incident_id)
         optimize = record.stages.get("optimize", {})
         recommended_plan_id = optimize.get("recommended_plan_id", "unknown")
+        stage_snapshot = {
+            stage_name: deepcopy(stage_payload)
+            for stage_name, stage_payload in record.stages.items()
+            if stage_name != "report"
+        }
 
         payload = {
             "incident_id": incident_id,
@@ -220,7 +226,7 @@ class IncidentService:
             "audit_trace": record.timeline,
             "confidence_trail": record.confidence_trail,
             "governance_trail": record.governance_trail,
-            "stages": record.stages,
+            "stages": stage_snapshot,
         }
         confidence = record.confidence
         warnings = record.warnings

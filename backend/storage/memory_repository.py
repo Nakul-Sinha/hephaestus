@@ -18,6 +18,10 @@ class InMemoryIncidentRepository:
     def __init__(self) -> None:
         self._incidents: dict[str, IncidentRecord] = {}
 
+    def clear(self) -> None:
+        """Reset repository state for deterministic test runs."""
+        self._incidents.clear()
+
     def create(self, incident_id: str, source: str, initial_stage: dict) -> IncidentRecord:
         now = datetime.now(timezone.utc)
         record = IncidentRecord(

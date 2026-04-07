@@ -12,6 +12,32 @@ The backend does not just serve model predictions. It closes the operational dec
 4. Simulate expected impact.
 5. Return stakeholder-ready outputs (operator, manager, audit).
 
+## Current Implementation Status
+
+Implemented in this backend module now:
+
+- FastAPI app with registered routes for:
+	- /health
+	- /ingest/batch
+	- /risk/analyze
+	- /incident/plan
+	- /incident/optimize
+	- /incident/simulate
+	- /incident/{id}/report
+	- /incident/run
+- Shared response envelope across success and error responses.
+- In-memory incident repository supporting full workflow state.
+- Pipeline service that coordinates staged execution and single-call full run.
+- Governance checks with confidence-floor escalation.
+- Deterministic fallback mode when ML agent runtime is unavailable.
+- API key auth guard on write endpoints via x-api-key.
+- Request-id middleware with response header propagation.
+- Structured request logging hooks.
+- Centralized exception handling that preserves envelope schema.
+- Backend tests:
+	- Unit tests for incident service lifecycle.
+	- Integration tests for write auth, staged API flow, and single-call pipeline flow.
+
 ## What This Service Owns
 
 - FastAPI request handling and endpoint contracts.
@@ -120,12 +146,6 @@ backend/
 	routes/               # HTTP route modules
 	storage/              # Persistence adapters and repositories
 ```
-
-## Naming Convention Policy
-
-- Repository docs/config files should use kebab-case when multi-word naming is needed.
-- API route paths use kebab-case segment style only when segments are multi-word.
-- Python modules remain snake_case by design to preserve valid imports and tooling compatibility.
 
 ## Local Development
 
