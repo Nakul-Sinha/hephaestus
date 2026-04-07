@@ -465,7 +465,7 @@ This is a critical differentiator. Most hackathon projects throw an LLM at every
 | Question | Answer |
 |---|---|
 | "What's your data source?" | Synthetic generator producing 1M+ telemetry rows across 200 assets with realistic degradation patterns and 4+ failure modes. Production-ready for real data connectors. |
-| "Which LLM do you use?" | OpenAI-compatible client or Ollama local inference. The architecture is model-agnostic — swap providers without changing agent logic. |
+| "Which LLM do you use?" | Primary: Ollama local inference (Mistral/Llama) for data privacy and zero API cost. Fallback: Google Gemini API when local inference is unavailable. The architecture is provider-agnostic — swap without changing agent logic. |
 | "How do you prevent hallucinations?" | LLMs are only used for synthesis and explanation, never for prediction. All LLM outputs have structured JSON schemas with required fields and are validated before use. |
 | "What's the tech stack?" | Python/FastAPI backend with 10 agents. PostgreSQL + Redis. Next.js/React/TypeScript dashboard. Docker Compose for deployment. |
 | "How fast does it run?" | Synchronous API for user interactions. Heavy model runs and simulation batches go through an async job queue (Celery/Redis). |

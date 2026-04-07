@@ -373,7 +373,8 @@ Weights are configurable by policy profiles.
 
 ### 12.3 Agentic and LLM Layer
 - LangGraph or custom agent graph orchestrator
-- OpenAI-compatible client OR Ollama local inference
+- Primary LLM: Ollama local inference (e.g., Mistral, Llama)
+- Fallback LLM: Google Gemini API (when local inference is unavailable or under load)
 - Structured tool-calling with JSON schemas
 
 ### 12.4 Storage and Messaging

@@ -1,0 +1,50 @@
+# ============================================================
+# Hephaestus ML (aegis) — Python Dependencies
+# Install: pip install -r requirements.txt
+# ============================================================
+
+# --- Core Framework ---
+fastapi>=0.111.0
+pydantic>=2.7.0
+uvicorn[standard]>=0.30.0
+
+# --- Data Processing ---
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.13.0
+pyarrow>=16.0.0              # parquet read/write support
+
+# --- Machine Learning ---
+scikit-learn>=1.5.0           # Isolation Forest, preprocessing, metrics
+xgboost>=2.0.0                # Gradient boosting for failure risk
+lightgbm>=4.3.0               # Alternative gradient boosting
+shap>=0.45.0                  # SHAP explainability for model outputs
+lifelines>=0.29.0             # Survival regression for RUL estimation
+
+# --- Agentic / LLM Layer ---
+langchain>=0.2.0              # LLM abstraction and tool-calling
+langchain-google-genai>=1.0.0 # Gemini integration for LangChain
+langgraph>=0.1.0              # Directed graph agent orchestration
+ollama>=0.3.0                 # Primary: local LLM inference (Mistral/Llama)
+google-generativeai>=0.7.0    # Fallback: Google Gemini API client
+
+# --- Async Task Queue ---
+celery>=5.4.0                 # Distributed task queue
+redis>=5.0.0                  # Redis client (cache + broker)
+
+# --- Database ---
+sqlalchemy>=2.0.30            # ORM and DB connection management
+psycopg2-binary>=2.9.9        # PostgreSQL driver
+alembic>=1.13.0               # Database migrations
+
+# --- Observability & Logging ---
+structlog>=24.1.0             # Structured JSON logging
+
+# --- Testing ---
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0                 # Async test client for FastAPI
+
+# --- Code Quality (dev only) ---
+ruff>=0.4.0                   # Linter + formatter
+mypy>=1.10.0                  # Static type checker

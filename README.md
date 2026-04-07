@@ -71,7 +71,7 @@ hephaestus/
 ## 💻 Tech Stack
 
 - **Core & Backend API:** Python 3.11+, FastAPI, Pydantic v2, Uvicorn, Celery/Redis
-- **Artificial Intelligence Framework:** LangGraph (Orchestration), Scikit-Learn (Isolation Forest), XGBoost/LightGBM, Survival regression, SHAP (Explainability features), OpenAI/Ollama (Reasoning logic).
+- **Artificial Intelligence Framework:** LangGraph (Orchestration), Scikit-Learn (Isolation Forest), XGBoost/LightGBM, Survival regression, SHAP (Explainability features), Ollama local inference (Primary) / Google Gemini API (Fallback).
 - **Solver & Simulation:** Numpy / Scipy
 - **Frontend Dashboard:** Next.js (App Router), React, TypeScript, Tailwind CSS, ECharts/Recharts
 - **Storage / Database:** PostgreSQL, Redis, optionally TimescaleDB
