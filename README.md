@@ -1,7 +1,7 @@
 <div align="center">
   <h1>⚒️ Hephaestus</h1>
   <p><strong>Multi-Agent AI Reliability Commander</strong></p>
-  <p><em>The AI that doesn't just tell you something broke — it tells you what will break, why, what to do about it, and proves it with numbers.</em></p>
+  <p><em>The AI that doesn't just tell you something broke it tells you what will break, why, what to do about it, and proves it with numbers.</em></p>
 </div>
 
 ---
