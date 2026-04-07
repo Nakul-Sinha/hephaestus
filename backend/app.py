@@ -1,12 +1,18 @@
-"""
-Hephaestus Backend — FastAPI app entry point.
+"""Hephaestus backend FastAPI application."""
 
-Endpoints:
-    GET  /health              — Health and dependency status
-    POST /ingest/batch        — Upload telemetry/events/maintenance dataset
-    POST /risk/analyze        — Run anomaly + failure risk computation
-    POST /incident/plan       — Produce causal explanation + candidate plans
-    POST /incident/optimize   — Return ranked intervention plan under constraints
-    POST /incident/simulate   — Run what-if and return projected outcomes
-    GET  /incident/{id}/report — Return final report in JSON and markdown
-"""
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from backend.config import get_settings
+from backend.routes import api_router
+
+settings = get_settings()
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Hephaestus backend API for predictive maintenance workflows.",
+)
+
+app.include_router(api_router)

@@ -1,0 +1,73 @@
+# backend tasks
+
+This file is the execution loop for completing the backend to the scope defined in context.md.
+
+## Rules For This Loop
+
+- Work by stage only.
+- At the end of each stage, create a commit with a conventional prefix:
+  - feat
+  - fix
+  - chore
+  - update
+- At the end of each stage, write a stage handoff note:
+  - stage-1.md
+  - stage-2.md
+  - ...
+- Each stage handoff must include:
+  - implemented work
+  - issues faced
+  - resolution details
+  - next-stage guidance for the next LLM pass
+
+## Stage 1 - Foundation API Skeleton
+
+- [x] Create backend API structure for route modules and service layer.
+- [x] Add shared response envelope models.
+- [x] Add settings and runtime configuration helpers.
+- [x] Implement /health endpoint with dependency health status.
+- [x] Wire FastAPI app with router registration and startup metadata.
+- [x] Create stage-1.md and commit stage.
+
+## Stage 2 - Incident Workflow Endpoints
+
+- [ ] Add ingest endpoint and request models.
+- [ ] Add risk analyze endpoint.
+- [ ] Add incident plan endpoint.
+- [ ] Add incident optimize endpoint.
+- [ ] Add incident simulate endpoint.
+- [ ] Add incident report endpoint.
+- [ ] Create in-memory repository for incident lifecycle persistence.
+- [ ] Create stage-2.md and commit stage.
+
+## Stage 3 - Orchestration + Governance
+
+- [ ] Add backend pipeline service that coordinates endpoint flow.
+- [ ] Add confidence propagation rules.
+- [ ] Add governance gate checks and warnings.
+- [ ] Add deterministic fallback behavior when ML agents are unavailable.
+- [ ] Add audit timeline payload for report responses.
+- [ ] Create stage-3.md and commit stage.
+
+## Stage 4 - Reliability + Security
+
+- [ ] Add API key auth guard for write endpoints (MVP).
+- [ ] Add request-id middleware and structured logging hooks.
+- [ ] Add centralized error handling with envelope responses.
+- [ ] Add input validation edge-case handling and clear warning paths.
+- [ ] Create stage-4.md and commit stage.
+
+## Stage 5 - Testing + Hardening
+
+- [ ] Add unit tests for service and repository logic.
+- [ ] Add API integration tests for health and incident flow.
+- [ ] Validate full flow: ingest -> risk -> plan -> optimize -> simulate -> report.
+- [ ] Update backend/readme.md with final implemented status notes.
+- [ ] Create stage-5.md and commit stage.
+
+## Definition Of Completion
+
+- [ ] All stage checklists complete.
+- [ ] Stage 1 through Stage 5 commits created.
+- [ ] Stage handoff files stage-1.md through stage-5.md exist.
+- [ ] Backend endpoints are functional and return standardized envelopes.
