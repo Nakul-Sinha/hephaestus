@@ -94,4 +94,67 @@ hephaestus/
 
 ---
 
+## Architecture
 
+```mermaid
+graph TB
+
+%% DATA SOURCES
+A[Telemetry Data<br>CSV / JSON / Streams]
+B[Event Logs]
+C[Maintenance History]
+
+%% INGESTION
+A --> D[Intake Agent<br>FastAPI + Pydantic]
+B --> D
+C --> D
+
+%% DATA VALIDATION
+D --> E[Quality Agent<br>Pandas + Numpy<br>Data Validation]
+
+%% EVENT BUS
+E --> F[Event Bus<br>Redis Streams]
+
+%% ANOMALY DETECTION
+F --> G[Sentinel Agent<br>Anomaly Detection<br>Isolation Forest + Z Score]
+
+%% FAILURE PREDICTION
+G --> H[Prognostics Agent<br>Failure Prediction<br>XGBoost / LightGBM]
+
+%% ROOT CAUSE ANALYSIS
+H --> I[Causal Agent<br>Explainability<br>SHAP Analysis]
+
+%% PLAN GENERATION
+I --> J[Planner Agent<br>LLM Planning<br>Mistral / Llama via Ollama]
+
+%% OPTIMIZATION
+J --> K[Optimizer Agent<br>Objective Function Scoring]
+
+%% SIMULATION
+K --> L[Simulation Agent<br>Monte Carlo Engine]
+
+%% PARALLEL SIMULATION
+L --> M1[Simulation Worker 1]
+L --> M2[Simulation Worker 2]
+L --> M3[Simulation Worker N]
+
+%% WORKER TECHNOLOGY
+M1 --> N[Celery Workers + Redis Queue]
+M2 --> N
+M3 --> N
+
+%% AGGREGATION
+N --> O[Simulation Result Aggregator<br>Pandas / Numpy]
+
+%% DECISION OUTPUT
+O --> P[Decision Package<br>Risk + Cost + Downtime]
+
+%% REPORT GENERATION
+P --> Q[Reporter Agent<br>LLM Report Generator]
+
+%% STORAGE
+Q --> R[(PostgreSQL<br>Decision & Telemetry Storage)]
+
+%% FRONTEND
+R --> S[Dashboard<br>Next.js + React + Tailwind]
+```
