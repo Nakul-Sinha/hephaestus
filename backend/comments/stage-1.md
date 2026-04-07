@@ -26,3 +26,4 @@
 - Build the full incident lifecycle endpoints and use a single in-memory repository for fast iteration.
 - Keep every endpoint returning the same response envelope contract.
 - Preserve request_id generation per endpoint while middleware is not added yet (middleware planned in Stage 4).
+
