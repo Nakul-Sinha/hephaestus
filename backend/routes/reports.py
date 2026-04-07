@@ -7,7 +7,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.models import ResponseEnvelope, build_envelope
-from backend.services import IncidentService, get_incident_service
+from backend.services import PipelineService, get_pipeline_service
 from backend.storage import IncidentNotFoundError
 
 router = APIRouter(tags=["reports"])
@@ -16,7 +16,7 @@ router = APIRouter(tags=["reports"])
 @router.get("/incident/{incident_id}/report", response_model=ResponseEnvelope)
 def get_report(
     incident_id: str,
-    service: IncidentService = Depends(get_incident_service),
+    service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
     """Return stakeholder report payload for an incident."""
     try:

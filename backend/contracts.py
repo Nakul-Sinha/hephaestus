@@ -54,6 +54,15 @@ class IncidentSimulateRequest(BaseModel):
     horizon_days: int = Field(default=30, ge=1, le=90)
 
 
+class RunIncidentRequest(BaseModel):
+    """Payload for running the entire incident pipeline in one call."""
+
+    ingest: IngestBatchRequest
+    lookahead_hours: int = Field(default=48, ge=1, le=168)
+    constraints: OptimizationConstraints = Field(default_factory=OptimizationConstraints)
+    horizon_days: int = Field(default=30, ge=1, le=90)
+
+
 class IncidentRecord(BaseModel):
     """In-memory representation of one incident lifecycle."""
 
@@ -63,5 +72,7 @@ class IncidentRecord(BaseModel):
     source: str
     stages: dict[str, dict[str, Any]] = Field(default_factory=dict)
     timeline: list[dict[str, Any]] = Field(default_factory=list)
+    confidence_trail: list[dict[str, Any]] = Field(default_factory=list)
+    governance_trail: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)

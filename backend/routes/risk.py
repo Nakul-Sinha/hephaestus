@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.contracts import RiskAnalyzeRequest
 from backend.models import ResponseEnvelope, build_envelope
-from backend.services import IncidentService, get_incident_service
+from backend.services import PipelineService, get_pipeline_service
 from backend.storage import IncidentNotFoundError
 
 router = APIRouter(tags=["risk"])
@@ -17,7 +17,7 @@ router = APIRouter(tags=["risk"])
 @router.post("/risk/analyze", response_model=ResponseEnvelope)
 def analyze_risk(
     request: RiskAnalyzeRequest,
-    service: IncidentService = Depends(get_incident_service),
+    service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
     """Analyze failure risk for an existing incident."""
     try:

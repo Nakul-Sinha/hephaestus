@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.contracts import IncidentOptimizeRequest, IncidentPlanRequest
 from backend.models import ResponseEnvelope, build_envelope
-from backend.services import IncidentService, get_incident_service
+from backend.services import PipelineService, get_pipeline_service
 from backend.storage import IncidentNotFoundError
 
 router = APIRouter(tags=["planning"])
@@ -17,7 +17,7 @@ router = APIRouter(tags=["planning"])
 @router.post("/incident/plan", response_model=ResponseEnvelope)
 def plan_incident(
     request: IncidentPlanRequest,
-    service: IncidentService = Depends(get_incident_service),
+    service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
     """Generate intervention plan options for an incident."""
     try:
@@ -41,7 +41,7 @@ def plan_incident(
 @router.post("/incident/optimize", response_model=ResponseEnvelope)
 def optimize_incident(
     request: IncidentOptimizeRequest,
-    service: IncidentService = Depends(get_incident_service),
+    service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
     """Rank and select plans under constraints."""
     try:

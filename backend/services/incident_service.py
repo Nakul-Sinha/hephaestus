@@ -33,6 +33,8 @@ class IncidentService:
             "notes": request.notes,
             "confidence": 1.0 if request.telemetry_rows > 0 else 0.7,
             "warnings": warnings,
+            "assumptions": ["input batch schema is validated at endpoint layer"],
+            "evidence_refs": ["ingest-summary"],
         }
         record = self.repository.create(incident_id=incident_id, source=request.source, initial_stage=payload)
         return {
@@ -52,6 +54,8 @@ class IncidentService:
             "failure_probability": risk_probability,
             "anomaly_score": round(min(0.99, risk_probability + 0.08), 2),
             "risk_band": "high" if risk_probability >= 0.7 else "medium",
+            "assumptions": ["degradation trend remains stable in lookahead window"],
+            "evidence_refs": ["telemetry-window", "ingest-stage"],
         }
         warnings = [] if telemetry_rows > 0 else ["risk computed from sparse telemetry"]
         confidence = 0.84 if telemetry_rows >= 5000 else 0.68
@@ -98,6 +102,8 @@ class IncidentService:
             "root_cause": "bearing_degradation",
             "root_cause_confidence": 0.78,
             "plans": plans,
+            "assumptions": ["bearing failure is primary cause for vibration profile"],
+            "evidence_refs": ["risk-stage", "maintenance-history"],
         }
         confidence = 0.79
         warnings = []
@@ -144,6 +150,8 @@ class IncidentService:
             "recommended_plan_id": recommended["plan_id"],
             "ranked_plans": sorted(scored_plans, key=lambda plan: plan["optimizer_score"], reverse=True),
             "constraints": request.constraints.model_dump(),
+            "assumptions": ["all plan scores are comparable after scalar normalization"],
+            "evidence_refs": ["plan-stage", "constraint-input"],
         }
         warnings = [] if feasible else ["no feasible plans found; fallback recommendation selected"]
         confidence = 0.83 if feasible else 0.55
@@ -175,6 +183,8 @@ class IncidentService:
         payload = {
             "horizon_days": request.horizon_days,
             "simulations": simulations,
+            "assumptions": ["short horizon risk interpolation approximates monte-carlo directionality"],
+            "evidence_refs": ["optimize-stage"],
         }
         confidence = 0.77
         warnings = []
@@ -202,6 +212,9 @@ class IncidentService:
                 "confidence": round(record.confidence, 2),
             },
             "audit_trace": record.timeline,
+            "confidence_trail": record.confidence_trail,
+            "governance_trail": record.governance_trail,
+            "stages": record.stages,
         }
         confidence = record.confidence
         warnings = record.warnings

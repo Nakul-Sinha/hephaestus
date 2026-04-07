@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.contracts import IncidentSimulateRequest
 from backend.models import ResponseEnvelope, build_envelope
-from backend.services import IncidentService, get_incident_service
+from backend.services import PipelineService, get_pipeline_service
 from backend.storage import IncidentNotFoundError
 
 router = APIRouter(tags=["simulation"])
@@ -17,7 +17,7 @@ router = APIRouter(tags=["simulation"])
 @router.post("/incident/simulate", response_model=ResponseEnvelope)
 def simulate_incident(
     request: IncidentSimulateRequest,
-    service: IncidentService = Depends(get_incident_service),
+    service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
     """Run what-if simulation for ranked plans."""
     try:

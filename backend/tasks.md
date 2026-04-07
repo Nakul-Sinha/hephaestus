@@ -42,12 +42,12 @@ This file is the execution loop for completing the backend to the scope defined 
 
 ## Stage 3 - Orchestration + Governance
 
-- [ ] Add backend pipeline service that coordinates endpoint flow.
-- [ ] Add confidence propagation rules.
-- [ ] Add governance gate checks and warnings.
-- [ ] Add deterministic fallback behavior when ML agents are unavailable.
-- [ ] Add audit timeline payload for report responses.
-- [ ] Create stage-3.md and commit stage.
+- [x] Add backend pipeline service that coordinates endpoint flow.
+- [x] Add confidence propagation rules.
+- [x] Add governance gate checks and warnings.
+- [x] Add deterministic fallback behavior when ML agents are unavailable.
+- [x] Add audit timeline payload for report responses.
+- [x] Create stage-3.md and commit stage.
 
 ## Stage 4 - Reliability + Security
 

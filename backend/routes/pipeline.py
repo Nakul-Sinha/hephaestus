@@ -1,4 +1,4 @@
-"""Ingest route implementation."""
+"""Single-call full incident pipeline route."""
 
 from __future__ import annotations
 
@@ -6,20 +6,20 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 
-from backend.contracts import IngestBatchRequest
+from backend.contracts import RunIncidentRequest
 from backend.models import ResponseEnvelope, build_envelope
 from backend.services import PipelineService, get_pipeline_service
 
-router = APIRouter(tags=["ingest"])
+router = APIRouter(tags=["pipeline"])
 
 
-@router.post("/ingest/batch", response_model=ResponseEnvelope)
-def ingest_batch(
-    request: IngestBatchRequest,
+@router.post("/incident/run", response_model=ResponseEnvelope)
+def run_incident_pipeline(
+    request: RunIncidentRequest,
     service: PipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope:
-    """Create a new incident context from a batch ingest request."""
-    payload, confidence, warnings = service.ingest_batch(request)
+    """Run the full decision loop in a single request."""
+    payload, confidence, warnings = service.run_full_pipeline(request)
     return build_envelope(
         request_id=f"req-{uuid4().hex[:10]}",
         payload=payload,

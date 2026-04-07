@@ -33,6 +33,13 @@ class InMemoryIncidentRepository:
                     "summary": "batch ingested",
                 }
             ],
+            confidence_trail=[
+                {
+                    "stage": "ingest",
+                    "confidence": initial_stage.get("confidence", 1.0),
+                    "timestamp": now.isoformat(),
+                }
+            ],
             confidence=initial_stage.get("confidence", 1.0),
             warnings=initial_stage.get("warnings", []),
         )
@@ -64,9 +71,23 @@ class InMemoryIncidentRepository:
                 "summary": f"{stage_name} completed",
             }
         )
+        record.confidence_trail.append(
+            {
+                "stage": stage_name,
+                "confidence": confidence,
+                "timestamp": now.isoformat(),
+            }
+        )
         if warnings:
             record.warnings.extend(warnings)
         record.confidence = min(record.confidence, confidence)
+        self._incidents[incident_id] = record
+        return record
+
+    def add_governance_event(self, incident_id: str, governance_event: dict) -> IncidentRecord:
+        """Append governance decision event for audit trail."""
+        record = self.get(incident_id)
+        record.governance_trail.append(governance_event)
         self._incidents[incident_id] = record
         return record
 
