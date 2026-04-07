@@ -79,6 +79,19 @@ hephaestus/
 
 ---
 
+## Naming Convention Policy
+
+- Repository docs/config files should use kebab-case when multi-word naming is needed.
+- API route paths use kebab-case segment style only when segments are multi-word.
+- Python modules remain snake_case by design to preserve valid imports and tooling compatibility.
+
+
+
 ## 🚀 Getting Started
 
 *(Development Guide coming soon once modules are initialized)*
+
+
+---
+
+

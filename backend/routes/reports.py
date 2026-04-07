@@ -1,0 +1,34 @@
+"""Reporting route implementation."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from backend.models import ResponseEnvelope, build_envelope
+from backend.services import PipelineService, get_pipeline_service
+from backend.storage import IncidentNotFoundError
+
+router = APIRouter(tags=["reports"])
+
+
+@router.get("/incident/{incident_id}/report", response_model=ResponseEnvelope)
+def get_report(
+    request_context: Request,
+    incident_id: str,
+    service: PipelineService = Depends(get_pipeline_service),
+) -> ResponseEnvelope:
+    """Return stakeholder report payload for an incident."""
+    try:
+        payload, confidence, warnings = service.generate_report(incident_id)
+    except IncidentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"incident not found: {exc}",
+        ) from exc
+
+    return build_envelope(
+        request_id=request_context.state.request_id,
+        payload=payload,
+        confidence=confidence,
+        warnings=warnings,
+    )
