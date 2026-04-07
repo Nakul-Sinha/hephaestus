@@ -31,14 +31,14 @@ This file is the execution loop for completing the backend to the scope defined 
 
 ## Stage 2 - Incident Workflow Endpoints
 
-- [ ] Add ingest endpoint and request models.
-- [ ] Add risk analyze endpoint.
-- [ ] Add incident plan endpoint.
-- [ ] Add incident optimize endpoint.
-- [ ] Add incident simulate endpoint.
-- [ ] Add incident report endpoint.
-- [ ] Create in-memory repository for incident lifecycle persistence.
-- [ ] Create stage-2.md and commit stage.
+- [x] Add ingest endpoint and request models.
+- [x] Add risk analyze endpoint.
+- [x] Add incident plan endpoint.
+- [x] Add incident optimize endpoint.
+- [x] Add incident simulate endpoint.
+- [x] Add incident report endpoint.
+- [x] Create in-memory repository for incident lifecycle persistence.
+- [x] Create stage-2.md and commit stage.
 
 ## Stage 3 - Orchestration + Governance
 
