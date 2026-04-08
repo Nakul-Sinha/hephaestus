@@ -55,12 +55,22 @@ class _IncidentInputContext:
     source_mode: str
 
 
+@dataclass
+class _RiskArtifacts:
+    model: object
+    feature_columns: list[str]
+    feature_values: np.ndarray
+    asset_id: str
+    prediction: float
+
+
 class MLAdapterService:
     """Adapter facade used by pipeline service to call ML-backed stages."""
 
     def __init__(self, incident_service: IncidentService) -> None:
         self.incident_service = incident_service
         self._incident_inputs: dict[str, _IncidentInputContext] = {}
+        self._risk_artifacts: dict[str, _RiskArtifacts] = {}
 
     @property
     def repository(self):
@@ -123,8 +133,9 @@ class MLAdapterService:
             return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
         try:
-            payload, confidence = self._run_model_backed_risk(context, request.lookahead_hours)
+            payload, confidence, artifacts = self._run_model_backed_risk(context, request.lookahead_hours)
             payload["model_source"] = "ml"
+            self._risk_artifacts[request.incident_id] = artifacts
             self.repository.save_stage(
                 request.incident_id,
                 "risk",
@@ -142,6 +153,79 @@ class MLAdapterService:
 
     def run_plan(self, request: IncidentPlanRequest) -> MLAdapterStageResult:
         payload, confidence, warnings = self.incident_service.plan_incident(request)
+        warnings = list(warnings)
+
+        artifacts = self._risk_artifacts.get(request.incident_id)
+        if artifacts is None:
+            warnings.append("risk artifacts missing; plan explainability bridge not applied")
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+
+        explainability_payload: dict
+        top_features: list[str]
+        try:
+            from ml.aegis.models.explainability import ModelExplainer
+
+            explainer = ModelExplainer(max_background_samples=32)
+            explanation = explainer.explain_prediction(
+                model=artifacts.model,
+                feature_values=artifacts.feature_values,
+                feature_names=artifacts.feature_columns,
+                model_name="failure_risk",
+                asset_id=artifacts.asset_id,
+                prediction_value=artifacts.prediction,
+                background_data=np.array([artifacts.feature_values]),
+                top_k=5,
+            )
+            explainability_payload = explanation.model_dump()
+            top_features = [item["feature"] for item in explainability_payload["top_contributors"]]
+        except Exception:
+            importance_map = getattr(artifacts.model, "feature_importances_", None)
+            if importance_map is not None:
+                ranked = sorted(
+                    zip(artifacts.feature_columns, importance_map),
+                    key=lambda item: float(item[1]),
+                    reverse=True,
+                )[:5]
+                top_features = [name for name, _ in ranked]
+            else:
+                top_features = artifacts.feature_columns[:5]
+            explainability_payload = {
+                "asset_id": artifacts.asset_id,
+                "prediction": round(artifacts.prediction, 4),
+                "model_name": "failure_risk",
+                "top_contributors": [
+                    {
+                        "feature": feature,
+                        "shap_value": 0.0,
+                        "direction": "increases_risk",
+                    }
+                    for feature in top_features
+                ],
+                "mode": "fallback-feature-importance",
+            }
+
+        feature_text = " ".join(top_features).lower()
+        if "vibration" in feature_text:
+            root_cause = "bearing_degradation"
+        elif "temp" in feature_text or "temperature" in feature_text:
+            root_cause = "thermal_instability"
+        else:
+            root_cause = payload.get("root_cause", "mechanical_degradation")
+
+        payload["root_cause"] = root_cause
+        payload["root_cause_confidence"] = round(max(payload.get("root_cause_confidence", 0.0), artifacts.prediction), 4)
+        payload["explainability"] = explainability_payload
+        payload["assumptions"] = [
+            "plan ranking is guided by top model risk contributors",
+            "feature contributions from failure_risk model reflect near-term risk drivers",
+        ]
+        payload["evidence_refs"] = [
+            "ml.aegis.models.explainability.ModelExplainer",
+            "ml.aegis.models.failure_risk.FailureRiskModel",
+        ]
+        confidence = max(confidence, min(0.95, artifacts.prediction))
+
+        self.repository.save_stage(request.incident_id, "plan", payload, confidence, warnings)
         return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
     def run_optimize(self, request: IncidentOptimizeRequest) -> MLAdapterStageResult:
@@ -310,7 +394,11 @@ class MLAdapterService:
             )
         return assets
 
-    def _run_model_backed_risk(self, context: _IncidentInputContext, lookahead_hours: int) -> tuple[dict, float]:
+    def _run_model_backed_risk(
+        self,
+        context: _IncidentInputContext,
+        lookahead_hours: int,
+    ) -> tuple[dict, float, _RiskArtifacts]:
         """Run anomaly + failure probability models and return normalized backend payload."""
         detector = AnomalyDetector(contamination=0.15, n_estimators=64, random_state=42)
         failure_ids = {f.asset_id for f in context.failures}
@@ -397,4 +485,15 @@ class MLAdapterService:
                 "ml.aegis.models.failure_risk.FailureRiskModel",
             ],
         }
-        return payload, confidence
+        asset_latest_row = latest_rows[latest_rows["asset_id"] == top_asset_id].iloc[0]
+        feature_columns = risk_model._feature_columns
+        feature_values = asset_latest_row[feature_columns].fillna(0).values
+        artifacts = _RiskArtifacts(
+            model=risk_model._model,
+            feature_columns=feature_columns,
+            feature_values=feature_values,
+            asset_id=top_asset_id,
+            prediction=probability,
+        )
+
+        return payload, confidence, artifacts

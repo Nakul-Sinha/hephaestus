@@ -1,4 +1,5 @@
 from backend.contracts import (
+    IncidentPlanRequest,
     IngestBatchRequest,
     RiskAnalyzeRequest,
 )
@@ -34,3 +35,8 @@ def test_ml_adapter_ingest_and_risk_smoke() -> None:
     assert 0.0 <= risk_result.payload["failure_probability"] <= 1.0
     assert 0.0 <= risk_result.confidence <= 1.0
     assert risk_result.payload["model_source"] == "ml"
+
+    plan_result = adapter.run_plan(IncidentPlanRequest(incident_id=incident_id))
+    assert plan_result.payload["root_cause"]
+    assert "explainability" in plan_result.payload
+    assert plan_result.payload["evidence_refs"]

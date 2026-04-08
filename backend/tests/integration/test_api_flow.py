@@ -46,6 +46,8 @@ def test_full_api_incident_flow() -> None:
 
     plan = client.post("/incident/plan", json={"incident_id": incident_id}, headers=API_HEADERS)
     assert plan.status_code == 200
+    plan_json = plan.json()
+    assert "explainability" in plan_json["payload"]
 
     optimize = client.post(
         "/incident/optimize",

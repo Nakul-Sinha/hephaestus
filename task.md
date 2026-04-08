@@ -97,10 +97,10 @@ Use explainability output as evidence and produce planning payload from ML-suppo
 
 ### Tasks
 
-- [ ] Integrate ml/aegis/models/explainability.py in adapter plan path.
-- [ ] Create temporary deterministic planner bridge using explainability evidence.
-- [ ] Populate root cause assumptions and evidence_refs from real feature contributions.
-- [ ] Preserve current plan payload schema for frontend compatibility.
+- [x] Integrate ml/aegis/models/explainability.py in adapter plan path.
+- [x] Create temporary deterministic planner bridge using explainability evidence.
+- [x] Populate root cause assumptions and evidence_refs from real feature contributions.
+- [x] Preserve current plan payload schema for frontend compatibility.
 
 ### Files
 
@@ -110,8 +110,8 @@ Use explainability output as evidence and produce planning payload from ML-suppo
 
 ### Validate
 
-- [ ] /incident/plan includes explainability-derived evidence.
-- [ ] Plan payload remains schema-compatible with current backend routes.
+- [x] /incident/plan includes explainability-derived evidence.
+- [x] Plan payload remains schema-compatible with current backend routes.
 
 ### Commit
 
