@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --forge-grid: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.06) 1px, transparent 0);
+  --forge-grid-size: 48px 48px;
+}
+
+body {
+  margin: 0;
+  background-color: #0b0b11;
+  color: #e7e2d7;
+  overflow-x: hidden;
+}
+
+.grain-overlay::before {
+  content: "";
+  position: fixed;
+  inset: -10%;
+  background-image: url("data:image/svg+xml,%3Csvg width='140' height='140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.28'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, #ffe6c5, #f2c96c 40%, #ff6a2a 70%, #3ef0d6);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.hero-mask {
+  mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 70%);
+}
+
+.button-glow {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.button-glow:hover {
+  box-shadow: 0 0 20px rgba(255,106,42,0.4);
+}
