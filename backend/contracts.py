@@ -16,6 +16,11 @@ class IngestBatchRequest(BaseModel):
     event_rows: int = Field(default=0, ge=0)
     maintenance_rows: int = Field(default=0, ge=0)
     notes: str = Field(default="")
+    asset_path: str | None = Field(default=None)
+    telemetry_path: str | None = Field(default=None)
+    event_path: str | None = Field(default=None)
+    maintenance_path: str | None = Field(default=None)
+    failure_path: str | None = Field(default=None)
 
 
 class RiskAnalyzeRequest(BaseModel):
@@ -61,6 +66,22 @@ class RunIncidentRequest(BaseModel):
     lookahead_hours: int = Field(default=48, ge=1, le=168)
     constraints: OptimizationConstraints = Field(default_factory=OptimizationConstraints)
     horizon_days: int = Field(default=30, ge=1, le=90)
+
+
+class MLAdapterHealth(BaseModel):
+    """Runtime health snapshot for ML adapter dependencies."""
+
+    ml_models_importable: bool
+    orchestrator_importable: bool
+    details: list[str] = Field(default_factory=list)
+
+
+class MLAdapterStageResult(BaseModel):
+    """Typed stage output contract from adapter to pipeline service."""
+
+    payload: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class IncidentRecord(BaseModel):

@@ -39,10 +39,15 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert risk.status_code == 200
-    assert risk.json()["status"] == "success"
+    risk_json = risk.json()
+    assert risk_json["status"] == "success"
+    assert risk_json["payload"]["model_source"] == "ml"
+    assert "deterministic fallback path used" not in " | ".join(risk_json["warnings"])
 
     plan = client.post("/incident/plan", json={"incident_id": incident_id}, headers=API_HEADERS)
     assert plan.status_code == 200
+    plan_json = plan.json()
+    assert "explainability" in plan_json["payload"]
 
     optimize = client.post(
         "/incident/optimize",
@@ -57,6 +62,9 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert optimize.status_code == 200
+    optimize_json = optimize.json()
+    assert optimize_json["payload"]["model_source"] == "ml"
+    assert optimize_json["payload"]["recommended_plan_id"]
 
     simulate = client.post(
         "/incident/simulate",
@@ -64,6 +72,10 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert simulate.status_code == 200
+    simulate_json = simulate.json()
+    assert simulate_json["payload"]["model_source"] == "ml"
+    assert simulate_json["payload"]["simulations"]
+    assert "uncertainty" in simulate_json["payload"]["simulations"][0]
 
     report = client.get(f"/incident/{incident_id}/report")
     assert report.status_code == 200
@@ -98,3 +110,6 @@ def test_single_call_pipeline_endpoint() -> None:
     response_json = response.json()
     assert response_json["status"] == "success"
     assert "report" in response_json["payload"]
+    assert response_json["payload"]["execution_mode"] == "ml-orchestrated"
+    assert "orchestrator" in response_json["payload"]
+    assert response_json["payload"]["orchestrator"]["status"] == "completed"

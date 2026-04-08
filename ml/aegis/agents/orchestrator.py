@@ -1,155 +1,145 @@
-"""
-Agent Orchestrator
-
-Manages the Directed Acyclic Graph (DAG) of the 10 Hephaestus agents.
-Handles routing, retries, and context propagation.
-"""
+"""Runtime orchestrator for executing the MVP agent graph."""
 
 from __future__ import annotations
 
-import time
-import uuid
-from typing import Any
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from time import perf_counter
+from typing import Callable
+from uuid import uuid4
 
-from ml.aegis.agents.intake_agent import IntakeAgent
-from ml.aegis.agents.quality_agent import QualityAgent
-from ml.aegis.agents.sentinel_agent import SentinelAgent
-from ml.aegis.agents.prognostics_agent import PrognosticsAgent
 from ml.aegis.agents.causal_agent import CausalAgent
-from ml.aegis.agents.planner_agent import PlannerAgent
-from ml.aegis.agents.optimizer_agent import OptimizerAgent
-from ml.aegis.agents.simulation_agent import SimulationAgent
-from ml.aegis.agents.reporter_agent import ReporterAgent
 from ml.aegis.agents.governance_agent import GovernanceAgent
+from ml.aegis.agents.intake_agent import IntakeAgent
+from ml.aegis.agents.optimizer_agent import OptimizerAgent
+from ml.aegis.agents.planner_agent import PlannerAgent
+from ml.aegis.agents.prognostics_agent import PrognosticsAgent
+from ml.aegis.agents.quality_agent import QualityAgent
+from ml.aegis.agents.reporter_agent import ReporterAgent
+from ml.aegis.agents.sentinel_agent import SentinelAgent
+from ml.aegis.agents.simulation_agent import SimulationAgent
+from ml.aegis.data.schemas import AgentOutput, PipelineResult
 
-from ml.aegis.data.schemas import AgentOutput, PipelineResult, GovernanceVerdict
+
+@dataclass(frozen=True)
+class StageExecution:
+    """A single stage execution contract used by the orchestrator runtime."""
+
+    stage_name: str
+    runner: Callable[[], tuple[dict, float, list[str]]]
+    retries: int = 1
 
 
 class Orchestrator:
-    """End-to-End Pipeline Orchestrator."""
+    """Execute staged workflow with retry handling and agent trace outputs."""
 
-    def __init__(self, models: dict[str, Any] | None = None):
-        """
-        Initialize orchestrator with optional pre-trained models.
-        """
-        self.models = models or {}
-        
-        # Instantiate the agents
-        self.agents = {
-            "intake_agent": IntakeAgent(),
-            "quality_agent": QualityAgent(),
-            "sentinel_agent": SentinelAgent(self.models.get("anomaly")),
-            "prognostics_agent": PrognosticsAgent(self.models.get("failure_risk")),
-            "causal_agent": CausalAgent(),
-            "planner_agent": PlannerAgent(),
-            "optimizer_agent": OptimizerAgent(),
-            "simulation_agent": SimulationAgent(),
-            "reporter_agent": ReporterAgent(),
-            "governance_agent": GovernanceAgent(),
-        }
+    def __init__(self, confidence_floor: float = 0.6) -> None:
+        self.confidence_floor = confidence_floor
+        self.intake_agent = IntakeAgent()
+        self.quality_agent = QualityAgent()
+        self.sentinel_agent = SentinelAgent()
+        self.prognostics_agent = PrognosticsAgent()
+        self.causal_agent = CausalAgent()
+        self.planner_agent = PlannerAgent()
+        self.optimizer_agent = OptimizerAgent()
+        self.simulation_agent = SimulationAgent()
+        self.reporter_agent = ReporterAgent()
+        self.governance_agent = GovernanceAgent(confidence_floor=confidence_floor)
 
-    def run_pipeline(
-        self,
-        data_source: str | dict | None = None,
-        context_override: dict[str, Any] | None = None,
-    ) -> PipelineResult:
-        """
-        Run the full Hephaestus intelligence pipeline.
-        
-        Args:
-            data_source: Path to telemetry data or a dict of DataFrames.
-            context_override: Pre-populated context data (used in tests/demos).
-            
-        Returns:
-            PipelineResult containing traces, verdicts, and final reports.
-        """
-        pipeline_run_id = str(uuid.uuid4())
-        start_time = time.time()
-        
-        # Initialize context
-        context = {
-            "pipeline_run_id": pipeline_run_id,
-            "data_source": data_source,
-            "agent_outputs": []
-        }
-        
-        if context_override:
-            context.update(context_override)
-            
+    def run(self, stage_executions: list[StageExecution], incident_id: str | None = None) -> dict:
+        """Run stage executions and return stage outputs plus orchestration trace."""
+        trace_id = incident_id or f"run-{uuid4().hex[:12]}"
+        started = perf_counter()
+
+        stage_payloads: dict[str, dict] = {}
+        stage_confidences: list[float] = []
+        all_warnings: list[str] = []
         agent_outputs: list[AgentOutput] = []
-        current_agent_name = "intake_agent"
-        
-        # Main execution loop (DAG traversal)
-        while current_agent_name:
-            agent = self.agents.get(current_agent_name)
-            if not agent:
-                print(f"[Orchestrator] Error: Agent '{current_agent_name}' not found.")
-                break
-                
-            # Execute with basic retry
-            output = None
-            max_retries = 2
-            
-            for attempt in range(max_retries):
-                try:
-                    output = agent.execute(context)
-                    break 
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        output = AgentOutput(
-                            input_context_id=pipeline_run_id,
-                            agent_name=current_agent_name,
-                            output_payload={"status": "failed_critical"},
-                            confidence_score=0.0,
-                            assumptions=[],
-                            evidence_refs=[],
-                            errors=[f"Agent completely failed: {e}"],
-                            next_recommended_agent="reporter_agent", # Escalate early on total failure
-                        )
-                    time.sleep(0.5) # simple backoff
-            
-            # Record output
-            agent_outputs.append(output)
-            context["agent_outputs"] = agent_outputs
-            
-            # Print trace for console visibility
-            print(f"[{pipeline_run_id[:8]}] {current_agent_name.ljust(20)} | "
-                  f"Conf: {output.confidence_score:.2f} | "
-                  f"Time: {output.execution_time_ms}ms")
-            
-            # Determine routing
-            if output.output_payload.get("status") == "failed_critical" and current_agent_name != "reporter_agent":
-                current_agent_name = "reporter_agent"
-            else:
-                current_agent_name = output.next_recommended_agent
-                
-        # Pipeline finished. Construct PipelineResult
-        end_time = time.time()
-        total_time_ms = round((end_time - start_time) * 1000, 2)
-        
-        # Extract verdict from governance agent
-        gov_output = next((o for o in agent_outputs if o.agent_name == "governance_agent"), None)
-        final_verdict = GovernanceVerdict.NEEDS_HUMAN_REVIEW
-        if gov_output:
-            raw_verdict = gov_output.output_payload.get("verdict")
-            try:
-                final_verdict = GovernanceVerdict(raw_verdict)
-            except Exception:
-                pass
-                
-        # Extract reporter outputs
-        rep_output = next((o for o in agent_outputs if o.agent_name == "reporter_agent"), None)
-        reports = {}
-        if rep_output:
-            reports = rep_output.output_payload.get("reports", {})
 
-        return PipelineResult(
-            pipeline_run_id=pipeline_run_id,
-            timestamp=datetime.now(),
-            total_execution_time_ms=total_time_ms,
-            agent_traces=agent_outputs,
-            final_verdict=final_verdict,
-            recommended_plan=context.get("recommended_plan_id"),
-            causal_hypotheses=context.get("causal_hypotheses", []),
-            generated_reports=reports,
+        for execution in stage_executions:
+            payload: dict
+            confidence: float
+            warnings: list[str]
+            last_error: Exception | None = None
+
+            for _ in range(execution.retries + 1):
+                try:
+                    payload, confidence, warnings = execution.runner()
+                    break
+                except Exception as exc:
+                    last_error = exc
+            else:
+                raise RuntimeError(f"stage {execution.stage_name} failed after retries: {last_error}") from last_error
+
+            stage_payloads[execution.stage_name] = payload
+            stage_confidences.append(confidence)
+            all_warnings.extend(warnings)
+
+            agent_outputs.extend(self._agent_outputs_for_stage(trace_id, execution.stage_name, payload))
+
+        governance_output = self.governance_agent.run(trace_id, stage_confidences=stage_confidences, warnings=all_warnings)
+        agent_outputs.append(governance_output)
+
+        now = datetime.now(timezone.utc)
+        final_plans = self._normalize_final_plans(
+            plans=list(stage_payloads.get("plan", {}).get("plans", [])),
+            default_confidence=min(stage_confidences) if stage_confidences else 0.6,
         )
+        pipeline_result = PipelineResult(
+            pipeline_run_id=trace_id,
+            started_at=now,
+            completed_at=now,
+            status="completed",
+            agent_outputs=agent_outputs,
+            final_plans=final_plans,
+            recommended_plan_id=stage_payloads.get("optimize", {}).get("recommended_plan_id"),
+            overall_confidence=min(stage_confidences) if stage_confidences else 0.0,
+            governance_verdict=governance_output.output_payload.get("verdict"),
+            warnings=all_warnings,
+            total_duration_ms=round((perf_counter() - started) * 1000.0, 3),
+        )
+
+        return {
+            "trace_id": trace_id,
+            "pipeline_result": pipeline_result.model_dump(mode="json"),
+            "stage_payloads": stage_payloads,
+            "confidence": min(stage_confidences) if stage_confidences else 0.0,
+            "warnings": all_warnings,
+        }
+
+    def _agent_outputs_for_stage(self, trace_id: str, stage_name: str, payload: dict) -> list[AgentOutput]:
+        if stage_name == "ingest":
+            return [
+                self.intake_agent.run(trace_id, payload),
+                self.quality_agent.run(trace_id, payload),
+            ]
+        if stage_name == "risk":
+            return [
+                self.sentinel_agent.run(trace_id, payload),
+                self.prognostics_agent.run(trace_id, payload),
+            ]
+        if stage_name == "plan":
+            return [
+                self.causal_agent.run(trace_id, payload),
+                self.planner_agent.run(trace_id, payload),
+            ]
+        if stage_name == "optimize":
+            return [self.optimizer_agent.run(trace_id, payload)]
+        if stage_name == "simulate":
+            return [self.simulation_agent.run(trace_id, payload)]
+        if stage_name == "report":
+            return [self.reporter_agent.run(trace_id, payload)]
+        return []
+
+    def _normalize_final_plans(self, plans: list[dict], default_confidence: float) -> list[dict]:
+        """Fill optional planner fields so plans satisfy shared schema contracts."""
+        normalized: list[dict] = []
+        for plan in plans:
+            candidate = dict(plan)
+            candidate.setdefault("estimated_duration_minutes", int(candidate.get("expected_downtime_minutes", 0)))
+            candidate.setdefault("maintenance_window", "any")
+            candidate.setdefault("confidence", round(default_confidence, 4))
+            candidate.setdefault("assumptions", [])
+            candidate.setdefault("rollback_plan", "fallback to manual intervention playbook")
+            normalized.append(candidate)
+        return normalized

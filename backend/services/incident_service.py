@@ -12,13 +12,13 @@ from backend.contracts import (
     IngestBatchRequest,
     RiskAnalyzeRequest,
 )
-from backend.storage import InMemoryIncidentRepository
+from backend.storage import IncidentRepository
 
 
 class IncidentService:
     """Coordinates stage computations and persists stage outputs."""
 
-    def __init__(self, repository: InMemoryIncidentRepository) -> None:
+    def __init__(self, repository: IncidentRepository) -> None:
         self.repository = repository
 
     def ingest_batch(self, request: IngestBatchRequest) -> dict:
