@@ -37,11 +37,14 @@ def test_ml_adapter_ingest_and_risk_smoke() -> None:
     assert 0.0 <= risk_result.payload["failure_probability"] <= 1.0
     assert 0.0 <= risk_result.confidence <= 1.0
     assert risk_result.payload["model_source"] == "ml"
+    assert "model_metadata" in risk_result.payload
+    assert "runtime_metrics" in risk_result.payload
 
     plan_result = adapter.run_plan(IncidentPlanRequest(incident_id=incident_id))
     assert plan_result.payload["root_cause"]
     assert "explainability" in plan_result.payload
     assert plan_result.payload["evidence_refs"]
+    assert "model_metadata" in plan_result.payload
 
     optimize_result = adapter.run_optimize(
         IncidentOptimizeRequest(
@@ -56,8 +59,10 @@ def test_ml_adapter_ingest_and_risk_smoke() -> None:
     assert optimize_result.payload["model_source"] == "ml"
     assert optimize_result.payload["recommended_plan_id"]
     assert optimize_result.payload["ranked_plans"]
+    assert "runtime_metrics" in optimize_result.payload
 
     simulate_result = adapter.run_simulate(IncidentSimulateRequest(incident_id=incident_id, horizon_days=21))
     assert simulate_result.payload["model_source"] == "ml"
     assert simulate_result.payload["simulations"]
     assert "pairwise_win_probabilities" in simulate_result.payload
+    assert "runtime_metrics" in simulate_result.payload

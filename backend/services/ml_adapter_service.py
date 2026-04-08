@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from importlib import import_module
-from typing import Callable
+from time import perf_counter
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -69,15 +72,78 @@ class _RiskArtifacts:
 class MLAdapterService:
     """Adapter facade used by pipeline service to call ML-backed stages."""
 
+    _DEFAULT_TIMEOUT_SECONDS = 20.0
+    _MAX_RETRIES = 1
+    _SLOW_STAGE_MS = 5000.0
+
     def __init__(self, incident_service: IncidentService) -> None:
         self.incident_service = incident_service
         self._incident_inputs: dict[str, _IncidentInputContext] = {}
         self._risk_artifacts: dict[str, _RiskArtifacts] = {}
+        self._runtime_metrics: list[dict[str, Any]] = []
 
     @property
     def repository(self):
         """Expose underlying repository for governance trail updates."""
         return self.incident_service.repository
+
+    def _record_runtime_metric(
+        self,
+        stage: str,
+        status: str,
+        attempt: int,
+        duration_ms: float,
+        detail: str = "",
+    ) -> None:
+        self._runtime_metrics.append(
+            {
+                "stage": stage,
+                "status": status,
+                "attempt": attempt,
+                "duration_ms": round(duration_ms, 3),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "detail": detail,
+            }
+        )
+
+    def _recent_runtime_metrics(self, stage: str, limit: int = 5) -> list[dict[str, Any]]:
+        """Return recent metrics for one stage to persist in stage payloads."""
+        return [metric for metric in self._runtime_metrics if metric["stage"] == stage][-limit:]
+
+    def _execute_with_guardrails(
+        self,
+        stage: str,
+        operation: Callable[[], Any],
+        timeout_seconds: float | None = None,
+        retries: int | None = None,
+    ) -> Any:
+        """Execute heavy ML operations with retry and timeout guardrails."""
+        timeout = timeout_seconds if timeout_seconds is not None else self._DEFAULT_TIMEOUT_SECONDS
+        max_retries = retries if retries is not None else self._MAX_RETRIES
+        last_exc: Exception | None = None
+
+        for attempt in range(1, max_retries + 2):
+            started = perf_counter()
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(operation)
+                try:
+                    result = future.result(timeout=timeout)
+                    duration_ms = (perf_counter() - started) * 1000.0
+                    status = "success-slow" if duration_ms > self._SLOW_STAGE_MS else "success"
+                    self._record_runtime_metric(stage, status, attempt, duration_ms)
+                    return result
+                except FutureTimeoutError as exc:
+                    duration_ms = (perf_counter() - started) * 1000.0
+                    detail = f"operation exceeded timeout of {timeout}s"
+                    self._record_runtime_metric(stage, "timeout", attempt, duration_ms, detail=detail)
+                    future.cancel()
+                    last_exc = TimeoutError(detail)
+                except Exception as exc:
+                    duration_ms = (perf_counter() - started) * 1000.0
+                    self._record_runtime_metric(stage, "error", attempt, duration_ms, detail=str(exc))
+                    last_exc = exc
+
+        raise RuntimeError(f"{stage} failed after {max_retries + 1} attempts: {last_exc}") from last_exc
 
     def health(self) -> MLAdapterHealth:
         """Return import health of key ML modules used by integration path."""
@@ -143,17 +209,26 @@ class MLAdapterService:
             return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
         try:
-            payload, confidence, artifacts = self._run_model_backed_risk(context, request.lookahead_hours)
+            payload, confidence, artifacts = self._execute_with_guardrails(
+                stage="risk",
+                operation=lambda: self._run_model_backed_risk(context, request.lookahead_hours),
+                timeout_seconds=25.0,
+                retries=1,
+            )
             payload["model_source"] = "ml"
+            payload["runtime_metrics"] = self._recent_runtime_metrics("risk")
             self._risk_artifacts[request.incident_id] = artifacts
+            warnings: list[str] = []
+            if payload["runtime_metrics"] and payload["runtime_metrics"][-1]["status"] == "success-slow":
+                warnings.append("risk stage exceeded preferred latency guardrail")
             self.repository.save_stage(
                 request.incident_id,
                 "risk",
                 payload,
                 confidence,
-                [],
+                warnings,
             )
-            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=[])
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
         except Exception as exc:
             payload, confidence, warnings = self.incident_service.analyze_risk(request)
             warnings = list(warnings)
@@ -176,15 +251,20 @@ class MLAdapterService:
             from ml.aegis.models.explainability import ModelExplainer
 
             explainer = ModelExplainer(max_background_samples=32)
-            explanation = explainer.explain_prediction(
-                model=artifacts.model,
-                feature_values=artifacts.feature_values,
-                feature_names=artifacts.feature_columns,
-                model_name="failure_risk",
-                asset_id=artifacts.asset_id,
-                prediction_value=artifacts.prediction,
-                background_data=np.array([artifacts.feature_values]),
-                top_k=5,
+            explanation = self._execute_with_guardrails(
+                stage="plan-explainability",
+                operation=lambda: explainer.explain_prediction(
+                    model=artifacts.model,
+                    feature_values=artifacts.feature_values,
+                    feature_names=artifacts.feature_columns,
+                    model_name="failure_risk",
+                    asset_id=artifacts.asset_id,
+                    prediction_value=artifacts.prediction,
+                    background_data=np.array([artifacts.feature_values]),
+                    top_k=5,
+                ),
+                timeout_seconds=20.0,
+                retries=0,
             )
             explainability_payload = explanation.model_dump()
             top_features = [item["feature"] for item in explainability_payload["top_contributors"]]
@@ -233,7 +313,20 @@ class MLAdapterService:
             "ml.aegis.models.explainability.ModelExplainer",
             "ml.aegis.models.failure_risk.FailureRiskModel",
         ]
+        payload["model_metadata"] = {
+            "model_name": "failure_risk",
+            "model_version": "0.1.0",
+            "feature_schema_version": "rolling-v1",
+        }
+        payload["feature_schema"] = {
+            "columns": artifacts.feature_columns,
+            "source": "risk-stage-artifacts",
+        }
+        payload["runtime_metrics"] = self._recent_runtime_metrics("plan-explainability")
         confidence = max(confidence, min(0.95, artifacts.prediction))
+
+        if payload["runtime_metrics"] and payload["runtime_metrics"][-1]["status"] == "success-slow":
+            warnings.append("plan explainability stage exceeded preferred latency guardrail")
 
         self.repository.save_stage(request.incident_id, "plan", payload, confidence, warnings)
         return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
@@ -249,7 +342,12 @@ class MLAdapterService:
             from ml.aegis.planning.optimizer import PlanOptimizer
 
             optimizer = PlanOptimizer()
-            optimization = optimizer.optimize(plans=plans, constraints=request.constraints.model_dump())
+            optimization = self._execute_with_guardrails(
+                stage="optimize",
+                operation=lambda: optimizer.optimize(plans=plans, constraints=request.constraints.model_dump()),
+                timeout_seconds=15.0,
+                retries=1,
+            )
 
             warnings: list[str] = []
             if not request.constraints.available_crew:
@@ -273,7 +371,16 @@ class MLAdapterService:
                     "ml.aegis.planning.optimizer.PlanOptimizer",
                 ],
                 "model_source": "ml",
+                "model_metadata": {
+                    "optimizer_name": "PlanOptimizer",
+                    "model_version": "0.1.0",
+                    "feature_schema_version": "plan-candidate-v1",
+                },
+                "runtime_metrics": self._recent_runtime_metrics("optimize"),
             }
+
+            if payload["runtime_metrics"] and payload["runtime_metrics"][-1]["status"] == "success-slow":
+                warnings.append("optimization stage exceeded preferred latency guardrail")
 
             confidence = optimization.confidence
             self.repository.save_stage(request.incident_id, "optimize", payload, confidence, warnings)
@@ -299,11 +406,16 @@ class MLAdapterService:
 
             risk_stage = record.stages.get("risk", {})
             baseline_risk = float(risk_stage.get("failure_probability", 0.87))
-            comparison = run_scenario_comparison(
-                ranked_plans=ranked_plans,
-                horizon_days=request.horizon_days,
-                baseline_risk=baseline_risk,
-                n_iterations=256,
+            comparison = self._execute_with_guardrails(
+                stage="simulate",
+                operation=lambda: run_scenario_comparison(
+                    ranked_plans=ranked_plans,
+                    horizon_days=request.horizon_days,
+                    baseline_risk=baseline_risk,
+                    n_iterations=256,
+                ),
+                timeout_seconds=20.0,
+                retries=1,
             )
 
             plan_lookup = {str(plan.get("plan_id")): plan for plan in ranked_plans}
@@ -354,8 +466,16 @@ class MLAdapterService:
                     "optimize-stage",
                 ],
                 "model_source": "ml",
+                "model_metadata": {
+                    "simulator_name": "run_scenario_comparison",
+                    "model_version": "0.1.0",
+                    "feature_schema_version": "simulation-scenario-v1",
+                },
+                "runtime_metrics": self._recent_runtime_metrics("simulate"),
             }
             warnings: list[str] = []
+            if payload["runtime_metrics"] and payload["runtime_metrics"][-1]["status"] == "success-slow":
+                warnings.append("simulation stage exceeded preferred latency guardrail")
 
             self.repository.save_stage(request.incident_id, "simulate", payload, confidence, warnings)
             return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
@@ -404,6 +524,7 @@ class MLAdapterService:
             "orchestrator": result["pipeline_result"],
             "orchestrator_trace_id": result["trace_id"],
             "execution_mode": "ml-orchestrated",
+            "ml_runtime_metrics": self._runtime_metrics[-25:],
         }
         return MLAdapterStageResult(
             payload=payload,
@@ -437,7 +558,7 @@ class MLAdapterService:
 
     def _build_context_from_direct_request(self, request: IngestBatchRequest) -> _IncidentInputContext:
         """Build small deterministic dataset for model execution in direct mode."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         timestamps = pd.date_range(end=now, periods=192, freq="15min")
 
         assets = [
@@ -550,7 +671,7 @@ class MLAdapterService:
 
     def _derive_assets_from_telemetry(self, telemetry_df: pd.DataFrame) -> list[AssetMaster]:
         """Create minimal asset master records when only telemetry is supplied."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         assets: list[AssetMaster] = []
         for idx, asset_id in enumerate(sorted(set(telemetry_df["asset_id"].astype(str).tolist()))):
             assets.append(
@@ -647,6 +768,17 @@ class MLAdapterService:
             "failure_horizon_hours": int(top["failure_horizon_hours"]),
             "risk_band": risk_band,
             "training_metrics": metrics,
+            "model_metadata": {
+                "anomaly_model": "AnomalyDetector",
+                "risk_model": "FailureRiskModel",
+                "model_version": "0.1.0",
+                "feature_schema_version": "rolling-v1",
+            },
+            "feature_schema": {
+                "columns": risk_model._feature_columns,
+                "window_hours": 24,
+                "stride_hours": 6,
+            },
             "assumptions": [
                 "latest per-asset rolling window is representative of short-term failure risk",
                 "anomaly and failure models are calibrated on adapter-provided context",

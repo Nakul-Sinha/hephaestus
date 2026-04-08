@@ -196,11 +196,11 @@ Move integration to production-safe persistence and runtime behavior.
 
 ### Tasks
 
-- [ ] Add postgres repository in backend/storage.
-- [ ] Persist stages, confidence trail, governance trail, and model metadata.
-- [ ] Add model/version and feature-schema metadata fields.
-- [ ] Add retry + timeout handling for heavy ML execution calls.
-- [ ] Add performance guardrails and structured metrics for ML calls.
+- [x] Add postgres repository in backend/storage.
+- [x] Persist stages, confidence trail, governance trail, and model metadata.
+- [x] Add model/version and feature-schema metadata fields.
+- [x] Add retry + timeout handling for heavy ML execution calls.
+- [x] Add performance guardrails and structured metrics for ML calls.
 
 ### Files
 
@@ -231,13 +231,13 @@ Move integration to production-safe persistence and runtime behavior.
 
 ### Integration
 
-- [ ] Existing backend API flow tests pass.
-- [ ] Add tests for model-backed outputs in /risk, /plan, /optimize, /simulate.
+- [x] Existing backend API flow tests pass.
+- [x] Add tests for model-backed outputs in /risk, /plan, /optimize, /simulate.
 - [ ] Add tests for fallback-on-error behavior.
 
 ### End-to-end
 
-- [ ] /incident/run full ML path on synthetic dataset.
+- [x] /incident/run full ML path on synthetic dataset.
 - [ ] Deterministic replay baseline in CI.
 
 ---
