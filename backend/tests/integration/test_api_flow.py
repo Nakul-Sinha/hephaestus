@@ -110,3 +110,6 @@ def test_single_call_pipeline_endpoint() -> None:
     response_json = response.json()
     assert response_json["status"] == "success"
     assert "report" in response_json["payload"]
+    assert response_json["payload"]["execution_mode"] == "ml-orchestrated"
+    assert "orchestrator" in response_json["payload"]
+    assert response_json["payload"]["orchestrator"]["status"] == "completed"

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from importlib import import_module
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,7 @@ from backend.contracts import (
     MLAdapterHealth,
     MLAdapterStageResult,
     RiskAnalyzeRequest,
+    RunIncidentRequest,
 )
 from backend.services.incident_service import IncidentService
 
@@ -90,7 +92,15 @@ class MLAdapterService:
                 return False
 
         models_ok = _importable("ml.aegis.models.anomaly") and _importable("ml.aegis.models.failure_risk")
-        orchestrator_ok = _importable("ml.aegis.agents.orchestrator")
+        orchestrator_ok = False
+        if _importable("ml.aegis.agents.orchestrator"):
+            try:
+                orchestrator_ok = hasattr(import_module("ml.aegis.agents.orchestrator"), "Orchestrator")
+                if not orchestrator_ok:
+                    details.append("ml.aegis.agents.orchestrator missing Orchestrator class")
+            except Exception as exc:
+                details.append(f"ml.aegis.agents.orchestrator validation failed: {exc}")
+                orchestrator_ok = False
 
         return MLAdapterHealth(
             ml_models_importable=models_ok,
@@ -361,6 +371,45 @@ class MLAdapterService:
     def run_report(self, incident_id: str) -> MLAdapterStageResult:
         payload, confidence, warnings = self.incident_service.generate_report(incident_id)
         return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+
+    def run_full_pipeline(
+        self,
+        request: RunIncidentRequest,
+        stage_runners: dict[str, Callable[[], tuple[dict, float, list[str]]]],
+        confidence_floor: float,
+    ) -> MLAdapterStageResult:
+        """Execute full pipeline through orchestrator runtime using stage callbacks."""
+        from ml.aegis.agents.orchestrator import Orchestrator, StageExecution
+
+        orchestrator = Orchestrator(confidence_floor=confidence_floor)
+        stage_executions = [
+            StageExecution(stage_name="ingest", runner=stage_runners["ingest"], retries=1),
+            StageExecution(stage_name="risk", runner=stage_runners["risk"], retries=1),
+            StageExecution(stage_name="plan", runner=stage_runners["plan"], retries=1),
+            StageExecution(stage_name="optimize", runner=stage_runners["optimize"], retries=1),
+            StageExecution(stage_name="simulate", runner=stage_runners["simulate"], retries=1),
+            StageExecution(stage_name="report", runner=stage_runners["report"], retries=1),
+        ]
+
+        result = orchestrator.run(stage_executions=stage_executions)
+        stages = result["stage_payloads"]
+        payload = {
+            "incident_id": stages.get("ingest", {}).get("incident_id"),
+            "ingest": stages.get("ingest", {}),
+            "risk": stages.get("risk", {}),
+            "plan": stages.get("plan", {}),
+            "optimize": stages.get("optimize", {}),
+            "simulate": stages.get("simulate", {}),
+            "report": stages.get("report", {}),
+            "orchestrator": result["pipeline_result"],
+            "orchestrator_trace_id": result["trace_id"],
+            "execution_mode": "ml-orchestrated",
+        }
+        return MLAdapterStageResult(
+            payload=payload,
+            confidence=float(result["confidence"]),
+            warnings=list(result["warnings"]),
+        )
 
     def _build_context_from_paths(self, request: IngestBatchRequest) -> _IncidentInputContext:
         """Build typed integration context from user-provided dataset paths."""

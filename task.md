@@ -164,11 +164,11 @@ Activate executable orchestrator path and use it for /incident/run.
 
 ### Tasks
 
-- [ ] Implement runnable Orchestrator class in ml/aegis/agents/orchestrator.py.
-- [ ] Implement minimum viable runtime logic in required agent modules.
-- [ ] Replace _ml_agents_available probe with orchestrator health check.
-- [ ] Route /incident/run through adapter orchestrator execution.
-- [ ] Keep per-stage endpoints working with same response contracts.
+- [x] Implement runnable Orchestrator class in ml/aegis/agents/orchestrator.py.
+- [x] Implement minimum viable runtime logic in required agent modules.
+- [x] Replace _ml_agents_available probe with orchestrator health check.
+- [x] Route /incident/run through adapter orchestrator execution.
+- [x] Keep per-stage endpoints working with same response contracts.
 
 ### Files
 
@@ -179,8 +179,8 @@ Activate executable orchestrator path and use it for /incident/run.
 
 ### Validate
 
-- [ ] /incident/run executes ML path end-to-end.
-- [ ] Fallback path triggers only on exception.
+- [x] /incident/run executes ML path end-to-end.
+- [x] Fallback path triggers only on exception.
 
 ### Commit
 
