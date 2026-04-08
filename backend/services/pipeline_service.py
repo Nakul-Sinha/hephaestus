@@ -14,7 +14,7 @@ from backend.contracts import (
     RiskAnalyzeRequest,
 )
 from backend.services.governance_service import GovernanceService
-from backend.services.incident_service import IncidentService
+from backend.services.ml_adapter_service import MLAdapterService
 
 
 class PipelineService:
@@ -22,16 +22,19 @@ class PipelineService:
 
     def __init__(
         self,
-        incident_service: IncidentService,
+        ml_adapter: MLAdapterService,
         governance_service: GovernanceService,
         settings: BackendSettings,
     ) -> None:
-        self.incident_service = incident_service
+        self.ml_adapter = ml_adapter
         self.governance_service = governance_service
         self.settings = settings
 
     def _ml_agents_available(self) -> bool:
         """Detect whether ML agent orchestrator implementation is callable."""
+        adapter_health = self.ml_adapter.health()
+        if not adapter_health.orchestrator_importable:
+            return False
         try:
             module = import_module("ml.aegis.agents.orchestrator")
             return hasattr(module, "Orchestrator")
@@ -57,7 +60,7 @@ class PipelineService:
             confidence=confidence,
             warnings=enriched_warnings,
         )
-        self.incident_service.repository.add_governance_event(incident_id, governance)
+        self.ml_adapter.repository.add_governance_event(incident_id, governance)
 
         enriched_payload = {
             **payload,
@@ -67,29 +70,35 @@ class PipelineService:
         return enriched_payload, confidence, enriched_warnings
 
     def ingest_batch(self, request: IngestBatchRequest) -> tuple[dict, float, list[str]]:
-        payload = self.incident_service.ingest_batch(request)
-        confidence = float(payload.get("ingest", {}).get("confidence", 1.0))
-        warnings = payload.get("ingest", {}).get("warnings", [])
+        stage_result = self.ml_adapter.run_ingest(request)
+        payload = stage_result.payload
+        confidence = stage_result.confidence
+        warnings = stage_result.warnings
         return self._enrich_with_governance(payload["incident_id"], "ingest", payload, confidence, warnings)
 
     def analyze_risk(self, request: RiskAnalyzeRequest) -> tuple[dict, float, list[str]]:
-        payload, confidence, warnings = self.incident_service.analyze_risk(request)
+        stage_result = self.ml_adapter.run_risk(request)
+        payload, confidence, warnings = stage_result.payload, stage_result.confidence, stage_result.warnings
         return self._enrich_with_governance(request.incident_id, "risk", payload, confidence, warnings)
 
     def plan_incident(self, request: IncidentPlanRequest) -> tuple[dict, float, list[str]]:
-        payload, confidence, warnings = self.incident_service.plan_incident(request)
+        stage_result = self.ml_adapter.run_plan(request)
+        payload, confidence, warnings = stage_result.payload, stage_result.confidence, stage_result.warnings
         return self._enrich_with_governance(request.incident_id, "plan", payload, confidence, warnings)
 
     def optimize_incident(self, request: IncidentOptimizeRequest) -> tuple[dict, float, list[str]]:
-        payload, confidence, warnings = self.incident_service.optimize_incident(request)
+        stage_result = self.ml_adapter.run_optimize(request)
+        payload, confidence, warnings = stage_result.payload, stage_result.confidence, stage_result.warnings
         return self._enrich_with_governance(request.incident_id, "optimize", payload, confidence, warnings)
 
     def simulate_incident(self, request: IncidentSimulateRequest) -> tuple[dict, float, list[str]]:
-        payload, confidence, warnings = self.incident_service.simulate_incident(request)
+        stage_result = self.ml_adapter.run_simulate(request)
+        payload, confidence, warnings = stage_result.payload, stage_result.confidence, stage_result.warnings
         return self._enrich_with_governance(request.incident_id, "simulate", payload, confidence, warnings)
 
     def generate_report(self, incident_id: str) -> tuple[dict, float, list[str]]:
-        payload, confidence, warnings = self.incident_service.generate_report(incident_id)
+        stage_result = self.ml_adapter.run_report(incident_id)
+        payload, confidence, warnings = stage_result.payload, stage_result.confidence, stage_result.warnings
         return self._enrich_with_governance(incident_id, "report", payload, confidence, warnings)
 
     def run_full_pipeline(self, request: RunIncidentRequest) -> tuple[dict, float, list[str]]:
@@ -123,12 +132,12 @@ class PipelineService:
         return payload, confidence, warnings
 
 
-def build_pipeline_service(incident_service: IncidentService) -> PipelineService:
+def build_pipeline_service(ml_adapter: MLAdapterService) -> PipelineService:
     """Construct pipeline service with governance dependencies."""
     settings = get_settings()
     governance_service = GovernanceService(settings=settings)
     return PipelineService(
-        incident_service=incident_service,
+        ml_adapter=ml_adapter,
         governance_service=governance_service,
         settings=settings,
     )

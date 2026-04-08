@@ -63,6 +63,22 @@ class RunIncidentRequest(BaseModel):
     horizon_days: int = Field(default=30, ge=1, le=90)
 
 
+class MLAdapterHealth(BaseModel):
+    """Runtime health snapshot for ML adapter dependencies."""
+
+    ml_models_importable: bool
+    orchestrator_importable: bool
+    details: list[str] = Field(default_factory=list)
+
+
+class MLAdapterStageResult(BaseModel):
+    """Typed stage output contract from adapter to pipeline service."""
+
+    payload: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class IncidentRecord(BaseModel):
     """In-memory representation of one incident lifecycle."""
 
