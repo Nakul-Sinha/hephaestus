@@ -1,12 +1,12 @@
 <div align="center">
-  <h1>⚒️ Hephaestus</h1>
+  <h1> Hephaestus</h1>
   <p><strong>Multi-Agent AI Reliability Commander</strong></p>
   <p><em>The AI that doesn't just tell you something broke it tells you what will break, why, what to do about it, and proves it with numbers.</em></p>
 </div>
 
 ---
 
-## 📖 Overview
+##  Overview
 
 Most modern maintenance operations rely heavily on either slow reactionary metrics (fixing it when it breaks) or blind-scheduled preventive tasks (costly and inefficient). Even modern predictive maintenance platforms stop at "anomaly detected," leaving you guessing why, and what actions you should take next.
 
@@ -16,7 +16,7 @@ Hephaestus tracks telemetry data to predict equipment failure, constructs an evi
 
 ---
 
-## ✨ System Capabilities
+##  System Capabilities
 
 * **High-Precision Risk Detection:** Uses machine-learning models (Isolation Forests, Gradient Boosting) to compute unsupervised anomalies and failure probabilities (RUL).
 * **Causal Reasoning:** Not just black-box predictions. Hephaestus generates hypothesis graphs with detailed certainty levels using SHAP explainability.
@@ -27,7 +27,7 @@ Hephaestus tracks telemetry data to predict equipment failure, constructs an evi
 
 ---
 
-## 🧠 The 10-Agent Pipeline
+##  The 10-Agent Pipeline
 
 Hephaestus coordinates 10 autonomous software agents. Each uses different models suited to their specialty (ML models for tracking telemetry, LLMs for reasoning and synthesis, mathematical solvers for simulations):
 
@@ -44,7 +44,7 @@ Hephaestus coordinates 10 autonomous software agents. Each uses different models
 
 ---
 
-## 📂 Repository Architecture
+##  Repository Architecture
 
 This is a monorepo partitioned into three core domain layers:
 
@@ -68,7 +68,7 @@ hephaestus/
 
 ---
 
-## 💻 Tech Stack
+##  Tech Stack
 
 - **Core & Backend API:** Python 3.11+, FastAPI, Pydantic v2, Uvicorn, Celery/Redis
 - **Artificial Intelligence Framework:** LangGraph (Orchestration), Scikit-Learn (Isolation Forest), XGBoost/LightGBM, Survival regression, SHAP (Explainability features), Ollama local inference (Primary) / Google Gemini API (Fallback).
@@ -87,7 +87,7 @@ hephaestus/
 
 
 
-## 🚀 Getting Started
+##  Getting Started
 
 *(Development Guide coming soon once modules are initialized)*
 

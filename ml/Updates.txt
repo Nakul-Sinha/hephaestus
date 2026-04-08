@@ -1,0 +1,357 @@
+================================================================================
+ HEPHAESTUS ML MODULE — DEVELOPMENT UPDATES LOG
+ Last Updated: 2026-04-07
+================================================================================
+
+
+PHASE 0: DATA FOUNDATION LAYER (COMPLETED)
+================================================================================
+
+Four core modules were implemented to create the entire data backbone that
+every model and agent in the system depends on.
+
+1. SCHEMAS — ml/aegis/data/schemas.py
+   - 16 Pydantic v2 BaseModel classes and 9 strict Enum types defining every data entity, agent contract, and output structure
+   - Validates incoming data and structures intervention plans and simulation results.
+
+2. SYNTHETIC DATA GENERATOR — ml/aegis/data/synthetic_generator.py
+   - Complete fleet data generation engine (200+ assets across 3 classes, 1M+ telemetry readings).
+   - Injects realistic degradation patterns (drift, spike, oscillation, freeze).
+
+3. DATA LOADERS — ml/aegis/data/loaders.py
+   - Typed loaders that read CSV/JSON/Parquet from disk into validated Pydantic models/DataFrames.
+
+4. DATA VALIDATORS — ml/aegis/data/validators.py
+   - 5 quality validation functions assessing missingness, sensor freeze, outliers, timestamp integrity, and KS-test feature drift.
+
+
+================================================================================
+PHASE 1: ML PREDICTION MODELS (COMPLETED)
+================================================================================
+
+Four ML model modules were implemented as the core prediction engine.
+
+1. ANOMALY DETECTION — ml/aegis/models/anomaly.py
+   - Hybrid Isolation Forest + robust MAD-based z-score detection. Filters healthy data from anomalies. Takes 24hr rolling windows.
+
+2. FAILURE RISK MODEL — ml/aegis/models/failure_risk.py
+   - Gradient boosting classifier (XGBoost/LightGBM) predicting probability of failure within the next 48 hours.
+
+3. RUL ESTIMATION — ml/aegis/models/rul.py
+   - Remaining Useful Life estimation via Cox Proportional Hazards (survival analysis) with GBR fallback.
+
+4. EXPLAINABILITY — ml/aegis/models/explainability.py
+   - SHAP-based feature contribution explanations (TreeExplainer/KernelExplainer) mapped to heuristic physical symptom constraints.
+
+
+================================================================================
+PHASE 2: AGENT INTELLIGENCE LAYER (COMPLETED)
+================================================================================
+
+11 modules were implemented representing 10 distinct AI agents + 1 orchestrator forming a Directed Acyclic Graph (DAG) pipeline.
+
+1. BASE AGENT — ml/aegis/agents/__init__.py
+   - Abstract Base Class. Enforces that all child agents trace their inputs and guarantee a standardized Pydantic `AgentOutput`.
+
+2. INTAKE AGENT — ml/aegis/agents/intake_agent.py
+   - Standardizes schema, validates units and timestamps, packages DataFrames.
+
+3. QUALITY AGENT — ml/aegis/agents/quality_agent.py
+   - Operates the validators from Phase 0. Emits verdicts that modify downstream confidence scores. Triggers circuit-breakers on bad data.
+
+4. SENTINEL AGENT — ml/aegis/agents/sentinel_agent.py
+   - Runs Anomaly Detector. Generates ranked lists of at-risk assets. Drops healthy assets from further processing to save compute.
+
+5. PROGNOSTICS AGENT — ml/aegis/agents/prognostics_agent.py
+   - Runs Failure Risk Model and SHAP extraction. Emits confidence intervals and predicted failure horizons.
+
+6. CAUSAL AGENT — ml/aegis/agents/causal_agent.py
+   - Uses an LLM (Ollama/Gemini) to perform Root Cause Analysis by correlating SHAP data, events, and maintenance logs into causal hypotheses.
+
+7. PLANNER AGENT — ml/aegis/agents/planner_agent.py
+   - Uses an LLM (Ollama/Gemini) to draft 3 tier variants of intervention plans (Aggressive, Moderate, Conservative). Enforces output via typed schemas. Includes heuristic fallback grids.
+
+8. OPTIMIZER AGENT — ml/aegis/agents/optimizer_agent.py
+   - Pure mathematical solver (NO LLM). Evaluates generated plans against constraints (budget, inventory) and scores them multi-objectively. Ranks and recommends the top plan.
+
+9. SIMULATION AGENT — ml/aegis/agents/simulation_agent.py
+   - Uses Numpy Monte Carlo simulations to plot risk trajectories (1000 iterations over 30 days) comparing feasible plans to a "do nothing" baseline.
+
+10. REPORTER AGENT — ml/aegis/agents/reporter_agent.py
+   - Uses LLM textual generation to compile the entire pipeline trace into an Operator Playbook, a Manager Summary, and an Audit Trace.
+
+11. GOVERNANCE AGENT — ml/aegis/agents/governance_agent.py
+   - Final safety gate. Enforces confidence floors and business rules (e.g. Tier-1 assets explicitly require human signoff).
+
+12. ORCHESTRATOR — ml/aegis/agents/orchestrator.py
+   - System conductor. Connects the 10 agents, passing Context dictionary down the chain. Configures resilient logic like retries, backoffs, short circuits, and collects the unified `PipelineResult`.
+
+
+================================================================================
+TECHNOLOGY STACK SUMMARY — WHAT'S IMPLEMENTED SO FAR
+================================================================================
+
+TECHNOLOGY           | WHERE IT'S USED             | WHY
+---------------------|-----------------------------|---------------------------------
+Pydantic v2          | schemas.py                  | Runtime type validation for all
+                     |                             | data flowing through the pipeline
+---------------------|-----------------------------|---------------------------------
+NumPy                | synthetic_generator.py      | Fast array ops for generating
+                     | models, agents              | features, stats, Monte Carlo sims
+---------------------|-----------------------------|---------------------------------
+Pandas               | models, data, agents        | DataFrame ops for tabular data
+---------------------|-----------------------------|---------------------------------
+SciPy                | validators.py               | KS-test for feature drift
+---------------------|-----------------------------|---------------------------------
+scikit-learn         | anomaly.py                  | IsolationForest, GBM fallback
+---------------------|-----------------------------|---------------------------------
+XGBoost / LightGBM   | failure_risk.py             | Gradient boosting classifiers
+---------------------|-----------------------------|---------------------------------
+lifelines            | rul.py                      | Cox PH Survival analysis
+---------------------|-----------------------------|---------------------------------
+SHAP                 | explainability.py           | Exact tree-based explanations
+---------------------|-----------------------------|---------------------------------
+Ollama API           | causal, planner, reporter   | Rapid, local, cost-free LLM inference
+                     |                             | for Agentic reasoning (JSON Mode)
+---------------------|-----------------------------|---------------------------------
+Google GenAI SDK     | causal, planner, reporter   | High-reliability Gemini model fallback
+                     |                             | when local Ollama is unavailable
+================================================================================
+
+
+FILES IMPLEMENTED SO FAR
+================================================================================
+
+Phase 0 — Data Layer:
+  ✅ ml/aegis/data/schemas.py              (16 models, 9 enums)
+  ✅ ml/aegis/data/synthetic_generator.py   (fleet + telemetry + events generator)
+  ✅ ml/aegis/data/loaders.py              (5 typed loaders, auto-format detect)
+  ✅ ml/aegis/data/validators.py           (5 quality checks + aggregate summary)
+
+Phase 1 — ML Models:
+  ✅ ml/aegis/models/anomaly.py            (AnomalyDetector: IF + z-score hybrid)
+  ✅ ml/aegis/models/failure_risk.py       (FailureRiskModel: XGBoost/LightGBM)
+  ✅ ml/aegis/models/rul.py                (RULEstimator: Cox PH + GBR fallback)
+  ✅ ml/aegis/models/explainability.py     (ModelExplainer: SHAP + hypothesis map)
+
+Phase 2 — Agents:
+  ✅ ml/aegis/agents/__init__.py           (BaseAgent + Exports)
+  ✅ ml/aegis/agents/intake_agent.py       (Intake validation + packaging)
+  ✅ ml/aegis/agents/quality_agent.py      (Quality + drift checks)
+  ✅ ml/aegis/agents/sentinel_agent.py     (Anomaly detection execution)
+  ✅ ml/aegis/agents/prognostics_agent.py  (Failure Risk + SHAP extraction)
+  ✅ ml/aegis/agents/causal_agent.py       (LLM Root Cause Analysis)
+  ✅ ml/aegis/agents/planner_agent.py      (LLM Maintenace plan generation)
+  ✅ ml/aegis/agents/optimizer_agent.py    (Math-based planning constraint check)
+  ✅ ml/aegis/agents/simulation_agent.py   (Monte Carlo trajectories)
+  ✅ ml/aegis/agents/reporter_agent.py     (LLM Report synthesis)
+  ✅ ml/aegis/agents/governance_agent.py   (Safety gate / policies)
+  ✅ ml/aegis/agents/orchestrator.py       (DAG Orchestrator / Error handler)
+
+Phase 3 — Optimization & Simulation:
+  ✅ ml/aegis/planning/constraints.py      (Feasibility checker with typed violations)
+  ✅ ml/aegis/planning/objective.py        (Multi-objective scorer + 5 policy profiles)
+  ✅ ml/aegis/simulation/monte_carlo.py    (Vectorized NumPy MC engine, 1000×30)
+  ✅ ml/aegis/simulation/scenario_engine.py (Plan comparison + pairwise outperformance)
+  ✅ ml/aegis/simulation/impact_estimator.py (ROI, savings, downtime avoided)
+
+Phase 4 — Feature Store:  ⬜ Not started
+Phase 5 — Telemetry:      ⬜ Not started
+Phase 6 — Testing:        ⬜ Not started
+
+
+================================================================================
+PHASE 3: OPTIMIZATION & SIMULATION ENGINES (COMPLETED)
+================================================================================
+
+Five standalone mathematical modules that formalize the inline math previously
+embedded in the Optimizer and Simulation agents into reusable, testable units.
+
+
+1. CONSTRAINTS MODULE — ml/aegis/planning/constraints.py
+--------------------------------------------------------------------------------
+
+   WHAT WAS BUILT:
+   Formal constraint validation system with typed ConstraintViolation objects
+   distinguishing "hard" (plan cannot proceed) from "soft" (warning only) violations.
+
+   TECHNOLOGIES USED:
+   - Python dataclasses: Lightweight structured data for PlanningConstraints
+     and ConstraintViolation. Dataclasses are used instead of Pydantic here
+     because these are internal configuration objects, not data flowing through
+     the pipeline — they don't need runtime validation overhead.
+
+   WHY IT'S HERE:
+   The Optimizer Agent needs to eliminate infeasible plans before scoring them.
+   Without formal constraint checking, a plan requiring a "bearing_specialist"
+   who isn't on the crew roster would still be recommended. This module catches
+   those violations and produces human-readable explanations for why a plan
+   was rejected.
+
+   WHAT IT DOES IN THE PROJECT:
+   - check_budget(): Hard violation if cost > ceiling, soft warning at 80%
+   - check_crew_availability(): Hard violation if a required skill has 0 staff
+   - check_parts_inventory(): Hard violation if a part isn't in stock
+   - check_blackout_windows(): Hard violation if maintenance overlaps a no-work period
+   - check_auto_approval(): Soft violation flagging plans above $10K for human sign-off
+   - check_plan_feasibility(): Runs all checks, returns (is_feasible, violations)
+   - summarize_violations(): Formats violations for agent payloads
+
+   STAGE: Called by the Optimizer Agent (Agent 7) before scoring.
+
+
+2. OBJECTIVE FUNCTION — ml/aegis/planning/objective.py
+--------------------------------------------------------------------------------
+
+   WHAT WAS BUILT:
+   Multi-objective weighted scoring function with 5 pre-defined policy profiles
+   and per-dimension score breakdowns.
+
+   TECHNOLOGIES USED:
+   - Python dataclasses: For PolicyWeights and NormalizationBounds.
+   - Pure math (no external libraries): The scoring function is a simple
+     weighted sum of normalized dimensions. No ML here — this is classical
+     multi-criteria decision analysis (MCDA).
+
+   WHY IT'S HERE:
+   Different organizations have different priorities. A hospital can't tolerate
+   downtime (uptime_priority profile). A startup watches every dollar
+   (cost_sensitive profile). The objective function lets the system rank the
+   same plans differently based on organizational policy.
+
+   WHAT IT DOES IN THE PROJECT:
+   - score_plan(): Returns a single 0-1 score for a plan
+   - score_plan_detailed(): Returns full breakdown showing each dimension's
+     raw value, normalized value, weight, and weighted contribution
+   - rank_plans(): Scores and sorts a list of plans
+   - 5 profiles: default (balanced), risk_averse, cost_sensitive,
+     uptime_priority, sla_focused
+   - Each plan dimension is normalized to 0-1 before weighting:
+     * risk_reduction: already 0-1
+     * cost: 1 - (cost / $10K baseline)
+     * downtime: 1 - (minutes / 480 baseline)
+     * sla: immediate=1.0, next_business_day=0.7, next_shutdown=0.4
+
+   STAGE: Called by the Optimizer Agent (Agent 7) after feasibility filtering.
+
+
+3. MONTE CARLO SIMULATION ENGINE — ml/aegis/simulation/monte_carlo.py
+--------------------------------------------------------------------------------
+
+   WHAT WAS BUILT:
+   A fully vectorized NumPy Monte Carlo engine that projects risk, cost, and
+   downtime trajectories over a 30-day horizon with 1000 stochastic iterations.
+
+   TECHNOLOGIES USED:
+   - NumPy (np.random.default_rng): Modern NumPy random number generator for
+     reproducible stochastic simulations. All operations are vectorized — no
+     Python loops over the 1000 iterations. This means 1000×30 = 30,000
+     risk values are computed in a single NumPy operation.
+   - Python dataclasses: For SimulationConfig (n_iterations, horizon_days,
+     noise parameters, random seed).
+
+   WHY IT'S HERE:
+   A point prediction ("failure probability = 0.73") doesn't tell you how
+   confident that number is. Monte Carlo simulation creates 1000 alternative
+   futures, each with slightly different degradation rates and repair outcomes.
+   The spread of those futures IS the uncertainty. Narrow bands = confident.
+   Wide bands = uncertain. This is what the Simulation Panel charts show.
+
+   WHAT IT DOES IN THE PROJECT:
+   - simulate_plan(): For one plan, runs 1000 iterations of:
+     * Sample degradation rate from Normal(mean, 0.01)
+     * Sample daily noise from Normal(0, 0.02)
+     * Apply intervention effect at the scheduled day
+     * Sample repair effectiveness from Normal(plan.risk_reduction, 0.05)
+     * Sample cost from Normal(plan.cost, plan.cost * 0.15)
+   - Outputs: daily_risk_mean, daily_risk_p5, daily_risk_p95 (90% CI bands)
+   - simulate_do_nothing(): Convenience wrapper for baseline scenario
+   - trajectory_summary(): Extracts key stats (day 1/7/14/30 risk, max p95)
+
+   STAGE: Called by the Simulation Agent (Agent 8) and Scenario Engine.
+
+
+4. SCENARIO COMPARISON ENGINE — ml/aegis/simulation/scenario_engine.py
+--------------------------------------------------------------------------------
+
+   WHAT WAS BUILT:
+   Side-by-side comparison of all candidate plans plus a "do nothing" baseline,
+   with pairwise outperformance probabilities.
+
+   TECHNOLOGIES USED:
+   - NumPy: For array operations on trajectory data.
+   - SciPy (scipy.stats.norm): For computing pairwise outperformance
+     probabilities. Given two plans with day-30 risk distributions
+     A ~ N(μ_a, σ_a²) and B ~ N(μ_b, σ_b²), computes P(A < B) using the
+     difference distribution D = B - A ~ N(μ_b - μ_a, σ_a² + σ_b²).
+
+   WHY IT'S HERE:
+   Judges will ask "why Plan A over Plan B?" This module answers: "Plan A
+   outperforms Plan B in 82% of simulated scenarios." That's a much stronger
+   argument than "Plan A scored 0.72 and Plan B scored 0.68."
+
+   WHAT IT DOES IN THE PROJECT:
+   - compare_plans(): Simulates all plans + baseline, picks best plan
+   - compute_pairwise_outperformance(): P(A better than B) for all pairs
+   - compute_all_pairwise(): Full matrix of pairwise probabilities
+   - format_for_frontend(): Structures output for the Simulation Panel charts
+     (one scenario per card, risk bands as chart series, pairwise table)
+
+   STAGE: Called by the Simulation Agent (Agent 8). Output feeds Reporter.
+
+
+5. IMPACT ESTIMATOR — ml/aegis/simulation/impact_estimator.py
+--------------------------------------------------------------------------------
+
+   WHAT WAS BUILT:
+   Business-impact calculator comparing condition-based intervention against
+   reactive (wait for failure) and scheduled (fixed-interval) maintenance
+   strategies.
+
+   TECHNOLOGIES USED:
+   - Python dataclasses: For CostAssumptions (reactive failure cost,
+     unplanned downtime cost per hour, scheduled maintenance cost).
+   - Pure math: Expected value calculations using failure probabilities
+     from Monte Carlo results.
+
+   WHY IT'S HERE:
+   This produces the pitch-deck numbers. "Our system saved $22,800 per
+   incident by catching bearing degradation 48 hours before failure."
+   These are the metrics that justify the entire project's existence.
+
+   WHAT IT DOES IN THE PROJECT:
+   - estimate_impact(): Computes three comparisons:
+     * vs Do Nothing: risk reduction %, downtime avoided hours, cost of
+       failure avoided, net savings, ROI %
+     * vs Scheduled: cost difference and precision advantage narrative
+     * 30-Day Projection: expected costs under all three strategies
+   - format_impact_for_report(): Renders impact metrics as formatted text
+     for the Manager Summary report
+   - Default assumptions: $25K reactive failure cost, $5K/hr unplanned
+     downtime cost, $3.5K scheduled maintenance cost
+
+   STAGE: Called after scenario comparison. Output goes to Reporter Agent
+   and the frontend Impact Dashboard.
+
+
+================================================================================
+UPDATED TECHNOLOGY STACK — PHASE 3 ADDITIONS
+================================================================================
+
+TECHNOLOGY           | WHERE IT'S USED             | WHY
+---------------------|-----------------------------|---------------------------------
+Python dataclasses   | constraints.py              | Lightweight config objects for
+                     | objective.py                | constraints, weights, and sim
+                     | monte_carlo.py              | parameters (no validation needed)
+---------------------|-----------------------------|---------------------------------
+NumPy (vectorized)   | monte_carlo.py              | 1000×30 stochastic simulations
+                     |                             | without Python loops (~50ms)
+---------------------|-----------------------------|---------------------------------
+SciPy (norm.cdf)     | scenario_engine.py          | Pairwise outperformance via
+                     |                             | normal difference distribution
+================================================================================
+
+
+================================================================================
+END OF UPDATE LOG
+================================================================================
