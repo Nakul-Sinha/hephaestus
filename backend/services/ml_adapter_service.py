@@ -229,12 +229,134 @@ class MLAdapterService:
         return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
     def run_optimize(self, request: IncidentOptimizeRequest) -> MLAdapterStageResult:
-        payload, confidence, warnings = self.incident_service.optimize_incident(request)
-        return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+        try:
+            record = self.repository.get(request.incident_id)
+            plan_payload = record.stages.get("plan", {})
+            plans = list(plan_payload.get("plans", []))
+            if not plans:
+                raise ValueError("plan stage must be completed before optimization")
+
+            from ml.aegis.planning.optimizer import PlanOptimizer
+
+            optimizer = PlanOptimizer()
+            optimization = optimizer.optimize(plans=plans, constraints=request.constraints.model_dump())
+
+            warnings: list[str] = []
+            if not request.constraints.available_crew:
+                warnings.append("available_crew not provided; skill feasibility used permissive defaults")
+            if not request.constraints.spare_parts_inventory:
+                warnings.append("spare_parts_inventory not provided; part feasibility used permissive defaults")
+            if optimization.feasible_count == 0:
+                warnings.append("no feasible plans found; fallback recommendation selected")
+
+            payload = {
+                "recommended_plan_id": optimization.recommended_plan_id,
+                "ranked_plans": optimization.ranked_plans,
+                "constraints": request.constraints.model_dump(),
+                "assumptions": [
+                    "multi-objective score balances risk reduction, cost, downtime, and SLA compliance",
+                    "hard constraints are enforced before recommendation",
+                ],
+                "evidence_refs": [
+                    "ml.aegis.planning.constraints",
+                    "ml.aegis.planning.objective",
+                    "ml.aegis.planning.optimizer.PlanOptimizer",
+                ],
+                "model_source": "ml",
+            }
+
+            confidence = optimization.confidence
+            self.repository.save_stage(request.incident_id, "optimize", payload, confidence, warnings)
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+        except ValueError:
+            raise
+        except Exception as exc:
+            payload, confidence, warnings = self.incident_service.optimize_incident(request)
+            warnings = list(warnings)
+            warnings.append(f"ml optimization execution failed; fallback used: {exc}")
+            payload["model_source"] = "fallback"
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
     def run_simulate(self, request: IncidentSimulateRequest) -> MLAdapterStageResult:
-        payload, confidence, warnings = self.incident_service.simulate_incident(request)
-        return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+        try:
+            record = self.repository.get(request.incident_id)
+            optimization = record.stages.get("optimize", {})
+            ranked_plans = list(optimization.get("ranked_plans", []))
+            if not ranked_plans:
+                raise ValueError("optimize stage must be completed before simulation")
+
+            from ml.aegis.simulation.scenario_engine import run_scenario_comparison
+
+            risk_stage = record.stages.get("risk", {})
+            baseline_risk = float(risk_stage.get("failure_probability", 0.87))
+            comparison = run_scenario_comparison(
+                ranked_plans=ranked_plans,
+                horizon_days=request.horizon_days,
+                baseline_risk=baseline_risk,
+                n_iterations=256,
+            )
+
+            plan_lookup = {str(plan.get("plan_id")): plan for plan in ranked_plans}
+            simulations = []
+            for result in comparison["simulations"]:
+                plan_id = str(result["plan_id"])
+                plan = plan_lookup.get(plan_id, {})
+                mean_curve = list(result["daily_risk_mean"])
+                middle_idx = len(mean_curve) // 2
+                risk_curve = [
+                    round(float(mean_curve[0]), 4),
+                    round(float(mean_curve[middle_idx]), 4),
+                    round(float(mean_curve[-1]), 4),
+                ]
+                cost_curve = [
+                    0.0,
+                    round(float(plan.get("estimated_cost", result["total_expected_cost"])), 2),
+                    round(float(result["total_expected_cost"]), 2),
+                ]
+
+                simulations.append(
+                    {
+                        "plan_id": plan_id,
+                        "risk_curve": risk_curve,
+                        "cost_curve": cost_curve,
+                        "downtime_hours": round(float(result["total_expected_downtime_hours"]), 2),
+                        "uncertainty": {
+                            "risk_p5_end": round(float(result["daily_risk_p5"][-1]), 4),
+                            "risk_p95_end": round(float(result["daily_risk_p95"][-1]), 4),
+                            "failure_probability": round(float(result["probability_of_failure"]), 4),
+                            "iterations": int(result["n_iterations"]),
+                        },
+                    }
+                )
+
+            confidence = 0.82
+            payload = {
+                "horizon_days": request.horizon_days,
+                "simulations": simulations,
+                "pairwise_win_probabilities": comparison["pairwise_win_probabilities"],
+                "assumptions": [
+                    "risk curves are generated from Monte Carlo sampling with plan-specific uncertainty",
+                    "pairwise win probabilities combine end-of-horizon risk and expected total cost",
+                ],
+                "evidence_refs": [
+                    "ml.aegis.simulation.monte_carlo",
+                    "ml.aegis.simulation.scenario_engine",
+                    "optimize-stage",
+                ],
+                "model_source": "ml",
+            }
+            warnings: list[str] = []
+
+            self.repository.save_stage(request.incident_id, "simulate", payload, confidence, warnings)
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
+        except ValueError:
+            raise
+        except Exception as exc:
+            payload, confidence, warnings = self.incident_service.simulate_incident(request)
+            warnings = list(warnings)
+            warnings.append(f"ml simulation execution failed; fallback used: {exc}")
+            payload["model_source"] = "fallback"
+            return MLAdapterStageResult(payload=payload, confidence=confidence, warnings=warnings)
 
     def run_report(self, incident_id: str) -> MLAdapterStageResult:
         payload, confidence, warnings = self.incident_service.generate_report(incident_id)

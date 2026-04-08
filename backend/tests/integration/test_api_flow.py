@@ -62,6 +62,9 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert optimize.status_code == 200
+    optimize_json = optimize.json()
+    assert optimize_json["payload"]["model_source"] == "ml"
+    assert optimize_json["payload"]["recommended_plan_id"]
 
     simulate = client.post(
         "/incident/simulate",
@@ -69,6 +72,10 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert simulate.status_code == 200
+    simulate_json = simulate.json()
+    assert simulate_json["payload"]["model_source"] == "ml"
+    assert simulate_json["payload"]["simulations"]
+    assert "uncertainty" in simulate_json["payload"]["simulations"][0]
 
     report = client.get(f"/incident/{incident_id}/report")
     assert report.status_code == 200

@@ -127,13 +127,13 @@ Implement real optimization and simulation modules and wire them into backend.
 
 ### Tasks
 
-- [ ] Implement ml/aegis/planning/constraints.py.
-- [ ] Implement ml/aegis/planning/objective.py.
-- [ ] Implement ml/aegis/planning/optimizer.py.
-- [ ] Implement ml/aegis/simulation/monte_carlo.py.
-- [ ] Implement ml/aegis/simulation/scenario_engine.py.
-- [ ] Connect adapter run_optimize and run_simulate to these modules.
-- [ ] Replace hardcoded optimization/simulation payload generation.
+- [x] Implement ml/aegis/planning/constraints.py.
+- [x] Implement ml/aegis/planning/objective.py.
+- [x] Implement ml/aegis/planning/optimizer.py.
+- [x] Implement ml/aegis/simulation/monte_carlo.py.
+- [x] Implement ml/aegis/simulation/scenario_engine.py.
+- [x] Connect adapter run_optimize and run_simulate to these modules.
+- [x] Replace hardcoded optimization/simulation payload generation.
 
 ### Files
 
@@ -147,8 +147,8 @@ Implement real optimization and simulation modules and wire them into backend.
 
 ### Validate
 
-- [ ] /incident/optimize reflects real constraints and scoring.
-- [ ] /incident/simulate returns uncertainty-aware outputs.
+- [x] /incident/optimize reflects real constraints and scoring.
+- [x] /incident/simulate returns uncertainty-aware outputs.
 
 ### Commit
 

@@ -1,5 +1,7 @@
 from backend.contracts import (
+    IncidentOptimizeRequest,
     IncidentPlanRequest,
+    IncidentSimulateRequest,
     IngestBatchRequest,
     RiskAnalyzeRequest,
 )
@@ -40,3 +42,22 @@ def test_ml_adapter_ingest_and_risk_smoke() -> None:
     assert plan_result.payload["root_cause"]
     assert "explainability" in plan_result.payload
     assert plan_result.payload["evidence_refs"]
+
+    optimize_result = adapter.run_optimize(
+        IncidentOptimizeRequest(
+            incident_id=incident_id,
+            constraints={
+                "budget_ceiling": 10000,
+                "available_crew": {"mechanic": 2, "bearing_specialist": 1},
+                "spare_parts_inventory": ["SKF_bearing", "lubricant"],
+            },
+        )
+    )
+    assert optimize_result.payload["model_source"] == "ml"
+    assert optimize_result.payload["recommended_plan_id"]
+    assert optimize_result.payload["ranked_plans"]
+
+    simulate_result = adapter.run_simulate(IncidentSimulateRequest(incident_id=incident_id, horizon_days=21))
+    assert simulate_result.payload["model_source"] == "ml"
+    assert simulate_result.payload["simulations"]
+    assert "pairwise_win_probabilities" in simulate_result.payload
