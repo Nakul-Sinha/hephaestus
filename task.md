@@ -62,13 +62,13 @@ Replace hardcoded risk generation with model-backed execution.
 
 ### Tasks
 
-- [ ] Map ingest input to datasets accepted by ml loaders.
-- [ ] Use ml/aegis/data/loaders.py for path-based input mode.
-- [ ] Implement in-memory DataFrame mode for direct payload mode.
-- [ ] Integrate anomaly flow from ml/aegis/models/anomaly.py.
-- [ ] Integrate failure probability flow from ml/aegis/models/failure_risk.py.
-- [ ] Persist model outputs and confidence into incident stages.
-- [ ] Keep deterministic fallback only on runtime exceptions.
+- [x] Map ingest input to datasets accepted by ml loaders.
+- [x] Use ml/aegis/data/loaders.py for path-based input mode.
+- [x] Implement in-memory DataFrame mode for direct payload mode.
+- [x] Integrate anomaly flow from ml/aegis/models/anomaly.py.
+- [x] Integrate failure probability flow from ml/aegis/models/failure_risk.py.
+- [x] Persist model outputs and confidence into incident stages.
+- [x] Keep deterministic fallback only on runtime exceptions.
 
 ### Files
 
@@ -80,8 +80,8 @@ Replace hardcoded risk generation with model-backed execution.
 
 ### Validate
 
-- [ ] /risk/analyze returns computed model values.
-- [ ] Fallback warning appears only on execution failure.
+- [x] /risk/analyze returns computed model values.
+- [x] Fallback warning appears only on execution failure.
 
 ### Commit
 

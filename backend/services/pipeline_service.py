@@ -30,9 +30,13 @@ class PipelineService:
         self.governance_service = governance_service
         self.settings = settings
 
-    def _ml_agents_available(self) -> bool:
-        """Detect whether ML agent orchestrator implementation is callable."""
+    def _ml_agents_available(self, stage: str) -> bool:
+        """Detect whether required ML runtime is available for a given stage."""
         adapter_health = self.ml_adapter.health()
+        # Stage-2 integration requires model modules for risk path.
+        if stage in {"ingest", "risk", "plan", "optimize", "simulate", "report"}:
+            return adapter_health.ml_models_importable
+
         if not adapter_health.orchestrator_importable:
             return False
         try:
@@ -49,7 +53,7 @@ class PipelineService:
         confidence: float,
         warnings: list[str],
     ) -> tuple[dict, float, list[str]]:
-        availability = self._ml_agents_available()
+        availability = self._ml_agents_available(stage)
         enriched_warnings = list(warnings)
         if not availability:
             enriched_warnings.append("ml agents unavailable; deterministic fallback path used")

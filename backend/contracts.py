@@ -16,6 +16,11 @@ class IngestBatchRequest(BaseModel):
     event_rows: int = Field(default=0, ge=0)
     maintenance_rows: int = Field(default=0, ge=0)
     notes: str = Field(default="")
+    asset_path: str | None = Field(default=None)
+    telemetry_path: str | None = Field(default=None)
+    event_path: str | None = Field(default=None)
+    maintenance_path: str | None = Field(default=None)
+    failure_path: str | None = Field(default=None)
 
 
 class RiskAnalyzeRequest(BaseModel):

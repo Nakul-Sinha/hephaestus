@@ -39,7 +39,10 @@ def test_full_api_incident_flow() -> None:
         headers=API_HEADERS,
     )
     assert risk.status_code == 200
-    assert risk.json()["status"] == "success"
+    risk_json = risk.json()
+    assert risk_json["status"] == "success"
+    assert risk_json["payload"]["model_source"] == "ml"
+    assert "deterministic fallback path used" not in " | ".join(risk_json["warnings"])
 
     plan = client.post("/incident/plan", json={"incident_id": incident_id}, headers=API_HEADERS)
     assert plan.status_code == 200
